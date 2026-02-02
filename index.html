@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoAttend - Login</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Loading Screen (shown on page load) -->
+  <div id="loadingScreen" class="loading-screen">
+    <div class="loading-screen-content">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+  </div>
+
+  <div class="auth-container" id="authContainer" style="display: none;">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>GeoAttend</h1>
+        <p>Geolocation + QR Attendance System</p>
+      </div>
+
+      <!-- Role Selection Gateway -->
+      <div id="roleGateway" class="role-gateway">
+        <h2>Choose Your Role</h2>
+        <p>Select how you want to access the system</p>
+        <div class="role-buttons">
+          <button class="btn btn-role btn-student" onclick="selectRole('student')">
+            <span class="role-icon">👨‍🎓</span>
+            <span class="role-text">Login as Student</span>
+          </button>
+          <button class="btn btn-role btn-lecturer" onclick="selectRole('lecturer')">
+            <span class="role-icon">👨‍🏫</span>
+            <span class="role-text">Login as Lecturer</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Login Form -->
+      <div id="loginForm" class="form-section" style="display: none;">
+        <div class="form-back">
+          <a href="#" onclick="backToRoleGateway()">← Back</a>
+        </div>
+        <h2 id="loginTitle">Login</h2>
+        <form id="loginFormElement">
+          <div class="form-group">
+            <label for="loginEmail">Email:</label>
+            <input type="email" id="loginEmail" required>
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">Password:</label>
+            <input type="password" id="loginPassword" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+        <p class="form-toggle">Don't have an account? <a href="#" onclick="toggleToSignup()">Sign Up</a></p>
+      </div>
+
+      <!-- Signup Form -->
+      <div id="signupForm" class="form-section" style="display: none;">
+        <div class="form-back">
+          <a href="#" onclick="backToRoleGateway()">← Back</a>
+        </div>
+        <h2>Sign Up</h2>
+        <form id="signupFormElement">
+          <div class="form-group">
+            <label for="signupEmail">Email:</label>
+            <input type="email" id="signupEmail" required>
+          </div>
+          <div class="form-group">
+            <label for="signupPassword">Password:</label>
+            <input type="password" id="signupPassword" required minlength="6">
+          </div>
+          <div class="form-group">
+            <label for="signupConfirmPassword">Confirm Password:</label>
+            <input type="password" id="signupConfirmPassword" required minlength="6">
+          </div>
+          <div class="form-group">
+            <label for="signupName">Full Name:</label>
+            <input type="text" id="signupName" required>
+          </div>
+          <div id="levelFieldContainer" class="form-group" style="display: none;">
+            <label for="signupLevel">Level/Year:</label>
+            <select id="signupLevel">
+              <option value="">Select Level</option>
+              <option value="100">Level 100</option>
+              <option value="200">Level 200</option>
+              <option value="300">Level 300</option>
+              <option value="400">Level 400</option>
+              <option value="500">Level 500</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Sign Up</button>
+        </form>
+        <p class="form-toggle">Already have an account? <a href="#" onclick="toggleToLogin()">Login</a></p>
+      </div>
+
+      <!-- Error Message -->
+      <div id="errorMessage" class="error-message"></div>
+
+      <!-- Loading Overlay (for form submission) -->
+      <div id="formLoadingSpinner" style="display: none;">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { setupAuthListener } from './js/firebase.js';
+    import { loginUser, registerUser, verifyRoleMatch } from './js/auth.js';
+
+    let selectedRole = null;
+    let isTransitioning = false;
+
+    // Check auth state on page load
+    window.addEventListener('load', () => {
+      setupAuthListener((user, role) => {
+        if (user && role) {
+          // User is logged in, redirect to dashboard
+          if (role === 'student') {
+            window.location.href = '/student.html';
+          } else if (role === 'lecturer') {
+            window.location.href = '/lecturer.html';
+          }
+        } else {
+          // User not logged in, show role gateway
+          hideLoadingScreen();
+          showAuthContainer();
+        }
+      });
+    });
+
+    window.selectRole = function(role) {
+      selectedRole = role;
+      document.getElementById('roleGateway').style.display = 'none';
+      document.getElementById('loginForm').style.display = 'block';
+      const title = role === 'student' ? 'Student Login' : 'Lecturer Login';
+      document.getElementById('loginTitle').textContent = title;
+      clearErrors();
+      document.getElementById('loginFormElement').reset();
+    };
+
+    window.backToRoleGateway = function(e) {
+      if (e) e.preventDefault();
+      selectedRole = null;
+      document.getElementById('roleGateway').style.display = 'block';
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('signupForm').style.display = 'none';
+      clearErrors();
+      document.getElementById('loginFormElement').reset();
+      document.getElementById('signupFormElement').reset();
+    };
+
+    window.toggleToSignup = function(e) {
+      if (e) e.preventDefault();
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('signupForm').style.display = 'block';
+      
+      // Show level field only for students
+      if (selectedRole === 'student') {
+        document.getElementById('levelFieldContainer').style.display = 'block';
+      }
+      clearErrors();
+    };
+
+    window.toggleToLogin = function(e) {
+      if (e) e.preventDefault();
+      document.getElementById('signupForm').style.display = 'none';
+      document.getElementById('loginForm').style.display = 'block';
+      clearErrors();
+    };
+
+    // Login form handler
+    document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      if (isTransitioning) return;
+      isTransitioning = true;
+      
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      
+      try {
+        showFormLoading(true);
+        clearErrors();
+        
+        // Login user
+        const user = await loginUser(email, password);
+        
+        // Verify role matches selected role
+        const roleMatches = await verifyRoleMatch(user.uid, selectedRole);
+        if (!roleMatches) {
+          throw new Error(`This email is registered as a ${selectedRole === 'student' ? 'lecturer' : 'student'}. Please use the correct login option.`);
+        }
+
+        showFormLoading(false);
+        console.log('[Auth] Login successful, redirecting to', selectedRole === 'student' ? '/student.html' : '/lecturer.html');
+        // Redirect immediately after successful login
+        setTimeout(() => {
+          window.location.href = selectedRole === 'student' ? '/student.html' : '/lecturer.html';
+        }, 500);
+      } catch (error) {
+        isTransitioning = false;
+        showFormLoading(false);
+        showError(error.message || 'Login failed. Please try again.');
+      }
+    });
+
+    // Signup form handler
+    document.getElementById('signupFormElement').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      if (isTransitioning) return;
+      isTransitioning = true;
+      
+      const email = document.getElementById('signupEmail').value.trim();
+      const password = document.getElementById('signupPassword').value;
+      const confirmPassword = document.getElementById('signupConfirmPassword').value;
+      const name = document.getElementById('signupName').value.trim();
+      const level = selectedRole === 'student' ? document.getElementById('signupLevel').value : null;
+      
+      try {
+        showFormLoading(true);
+        clearErrors();
+        
+        if (password !== confirmPassword) {
+          throw new Error('Passwords do not match');
+        }
+        
+        if (selectedRole === 'student' && !level) {
+          throw new Error('Please select your level');
+        }
+
+        await registerUser(email, password, name, selectedRole, level);
+        showFormLoading(false);
+        console.log('[Auth] Signup successful, redirecting to', selectedRole === 'student' ? '/student.html' : '/lecturer.html');
+        // Redirect immediately after successful signup
+        setTimeout(() => {
+          window.location.href = selectedRole === 'student' ? '/student.html' : '/lecturer.html';
+        }, 500);
+      } catch (error) {
+        isTransitioning = false;
+        showFormLoading(false);
+        showError(error.message || 'Registration failed. Please try again.');
+      }
+    });
+
+    function showError(message) {
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+
+    function clearErrors() {
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = '';
+      errorDiv.style.display = 'none';
+    }
+
+    function showFormLoading(show) {
+      const spinner = document.getElementById('formLoadingSpinner');
+      spinner.style.display = show ? 'flex' : 'none';
+    }
+
+    function hideLoadingScreen() {
+      document.getElementById('loadingScreen').style.display = 'none';
+    }
+
+    function showAuthContainer() {
+      document.getElementById('authContainer').style.display = 'block';
+    }
+  </script>
+</body>
+</html>

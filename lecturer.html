@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoAttend - Lecturer Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://davidshimjs.github.io/qrcodejs/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+  <div class="navbar">
+    <div class="navbar-content">
+      <h1 class="app-title">GeoAttend</h1>
+      <div class="user-info">
+        <span id="lecturerName">Loading...</span>
+        <button id="logoutBtn" class="btn btn-secondary">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lecturer-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h3>Menu</h3>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <button class="sidebar-item active" data-view="start-session">
+          <span class="sidebar-icon">📝</span>
+          <span class="sidebar-text">Start Session</span>
+        </button>
+        <button class="sidebar-item" data-view="sessions-list">
+          <span class="sidebar-icon">📋</span>
+          <span class="sidebar-text">Sessions</span>
+        </button>
+      </nav>
+
+      <!-- Sessions List in Sidebar -->
+      <div id="sessionsListSidebar" class="sidebar-section" style="display: none;">
+        <h4>Recent Sessions</h4>
+        <div id="sidebarSessionsList" class="sessions-list-sidebar">
+          <p class="empty-text">No sessions yet</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Start Session View -->
+      <div id="startSessionView" class="view-panel active">
+        <div class="card">
+          <h2>Start Attendance Session</h2>
+          <form id="sessionForm">
+            <div class="form-group">
+              <label for="radiusInput">Attendance Radius (meters):</label>
+              <input type="number" id="radiusInput" min="1" max="1000" value="50" required>
+              <small>Range: 1-1000 meters</small>
+            </div>
+
+            <div class="form-group">
+              <label for="durationInput">Session Duration (minutes):</label>
+              <input type="number" id="durationInput" min="1" max="480" value="30" required>
+              <small>Range: 1-480 minutes</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Start Session</button>
+          </form>
+
+          <!-- Error Message -->
+          <div id="errorMessage" class="error-message"></div>
+
+          <!-- Success Message -->
+          <div id="successMessage" class="success-message"></div>
+        </div>
+
+        <!-- Session Panel -->
+        <div id="sessionPanel" class="card" style="display: none;">
+          <div class="session-header">
+            <div>
+              <h2>Active Session</h2>
+              <p>Session ID: <span id="sessionId">-</span></p>
+              <p>Status: <span id="sessionStatus" style="color: #2d5016;">Active</span></p>
+            </div>
+            <div class="timer-display">
+              <div id="timerDisplay" class="timer">--:--</div>
+              <p>Time Remaining</p>
+            </div>
+          </div>
+
+          <!-- QR Code -->
+          <div class="qr-section">
+            <h3>QR Code</h3>
+            <div id="qrCodeContainer" class="qr-code-container"></div>
+          </div>
+
+          <!-- Attendance List -->
+          <div class="attendance-section">
+            <div class="attendance-header">
+              <h3>Student Attendance (<span id="attendanceCount">0</span>)</h3>
+              <div class="attendance-sort-controls">
+                <label for="sortDropdown">Sort by:</label>
+                <select id="sortDropdown" class="sort-dropdown">
+                  <option value="time">Time (First Attended)</option>
+                  <option value="alphabetical">Name (A-Z)</option>
+                </select>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="attendance-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Level</th>
+                    <th>Method</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody id="attendanceList">
+                  <tr>
+                    <td colspan="4" style="text-align: center; color: #999;">Waiting for attendance...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- End Session Button -->
+          <div class="button-group">
+            <button id="endSessionBtn" class="btn btn-danger">End Session</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sessions List View -->
+      <div id="sessionsListView" class="view-panel">
+        <div class="card">
+          <h2>All Sessions</h2>
+          <div id="allSessionsList" class="sessions-grid">
+            <p class="empty-text">No sessions yet</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session Details View -->
+      <div id="sessionDetailsView" class="view-panel">
+        <div class="card">
+          <div class="session-details-header">
+            <div>
+              <h2>Session Details</h2>
+              <p>Session ID: <span id="detailsSessionId">-</span></p>
+              <p>Date: <span id="detailsSessionDate">-</span></p>
+              <p>Attended: <span id="detailsAttendanceCount">0</span> students</p>
+            </div>
+            <button id="exportPdfBtn" class="btn btn-primary">📥 Export as PDF</button>
+          </div>
+
+          <!-- Session QR Code -->
+          <div class="qr-section">
+            <h3>QR Code Used</h3>
+            <div id="detailsQrCodeContainer" class="qr-code-container"></div>
+          </div>
+
+          <!-- Attendance Table -->
+          <div class="attendance-section">
+            <h3>Attendance Details</h3>
+            <div class="table-container">
+              <table class="attendance-table">
+                <thead>
+                  <tr>
+                    <th>Student Name</th>
+                    <th>Level</th>
+                    <th>Method</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody id="detailsAttendanceList">
+                  <tr>
+                    <td colspan="4" style="text-align: center; color: #999;">No attendance records</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Back Button -->
+          <div class="button-group">
+            <button id="backToListBtn" class="btn btn-secondary">Back to Sessions</button>
+            <button id="deleteSessionBtn" class="btn btn-danger">Delete Session</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Location Timeout Modal -->
+  <div id="locationModal" class="modal">
+    <div class="modal-content">
+      <h2>Location Required</h2>
+      <p>
+        We couldn't detect your location. This could be because:
+      </p>
+      <ul>
+        <li>Location services are disabled</li>
+        <li>The request timed out</li>
+        <li>Permission was denied</li>
+      </ul>
+      <p>
+        You can continue with QR-only attendance, or retry to enable geolocation-based attendance.
+      </p>
+      <div class="modal-buttons">
+        <button id="retryLocationBtn" class="btn btn-primary">Retry Location</button>
+        <button id="continueQRBtn" class="btn btn-secondary">Continue (QR-Only)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div id="loadingSpinner" style="display: none;">
+    <div class="spinner"></div>
+  </div>
+
+  <script type="module">
+    import { initLecturerDashboard } from './js/lecturer.js';
+    import { auth, db } from './js/firebase.js';
+    import { getDoc, doc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    let dashboardInitialized = false;
+    console.log('[Lecturer] Page loaded');
+
+    // Single initialization on page load
+    async function initDashboard() {
+      console.log('[Lecturer] Initializing...');
+      
+      if (dashboardInitialized) {
+        console.log('[Lecturer] Already initialized');
+        return;
+      }
+      
+      // Wait for auth to be ready
+      await new Promise(resolve => {
+        const unsubscribe = auth.onAuthStateChanged(() => {
+          unsubscribe();
+          resolve();
+        });
+      });
+      
+      const user = auth.currentUser;
+      console.log('[Lecturer] Current user:', user?.uid);
+      
+      if (!user) {
+        console.log('[Lecturer] No user, redirecting');
+        window.location.href = '/';
+        return;
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const role = userDoc.data()?.role;
+        console.log('[Lecturer] User role:', role);
+        
+        if (role === 'student') {
+          console.log('[Lecturer] Wrong role, redirecting to student');
+          window.location.href = '/student.html';
+          return;
+        }
+      } catch (error) {
+        console.error('[Lecturer] Role check error:', error);
+        // Continue anyway
+      }
+
+      dashboardInitialized = true;
+      console.log('[Lecturer] Initializing dashboard');
+      await initLecturerDashboard();
+      console.log('[Lecturer] Dashboard ready');
+    }
+
+    // Start immediately
+    initDashboard().catch(err => console.error('[Lecturer] Init error:', err));
+  </script>
+</body>
+</html>

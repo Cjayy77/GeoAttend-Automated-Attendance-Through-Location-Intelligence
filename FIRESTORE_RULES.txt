@@ -1,0 +1,102 @@
+/**
+ * FIRESTORE SECURITY RULES
+ * 
+ * These rules implement:
+ * - Users: Can only read/write their own profile
+ * - Sessions: Lecturers create, all authenticated users read
+ * - Attendance: Students write only their own, all read for real-time updates
+ */
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Allow signed-in users to check existence
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Helper to get user document
+    function getUserRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+    
+    // Helper to check if user is lecturer
+    function isLecturer() {
+      return isSignedIn() && getUserRole(request.auth.uid) == 'lecturer';
+    }
+    
+    // Helper to check if user is student
+    function isStudent() {
+      return isSignedIn() && getUserRole(request.auth.uid) == 'student';
+    }
+    
+    // ===========================
+    // Users Collection
+    // ===========================
+    match /users/{userId} {
+      // Users can only read their own profile
+      allow read: if request.auth.uid == userId;
+      
+      // Users can create their profile (during signup)
+      allow create: if request.auth.uid == userId 
+        && request.resource.data.role in ['student', 'lecturer']
+        && request.resource.data.email is string
+        && request.resource.data.name is string;
+      
+      // Users can update their own profile
+      allow update: if request.auth.uid == userId;
+      
+      // Prevent deletion
+      allow delete: if false;
+    }
+    
+    // ===========================
+    // Sessions Collection
+    // ===========================
+    match /sessions/{sessionId} {
+      // All authenticated users can read sessions (needed for student dashboard)
+      allow read: if isSignedIn();
+      
+      // Only lecturers can create sessions with their own ID
+      allow create: if isLecturer() 
+        && request.resource.data.lecturerId == request.auth.uid
+        && request.resource.data.active is bool
+        && request.resource.data.geoEnabled is bool
+        && request.resource.data.qrOnly is bool;
+      
+      // Only the session creator (lecturer) can update
+      allow update: if isSignedIn()
+        && resource.data.lecturerId == request.auth.uid;
+      
+      // Prevent deletion
+      allow delete: if false;
+    }
+    
+    // ===========================
+    // Attendance Collection
+    // ===========================
+    match /attendance/{attendanceId} {
+      // All authenticated users can read attendance (for lecturer dashboard real-time)
+      allow read: if isSignedIn();
+      
+      // Students can only write their own attendance
+      allow create: if isSignedIn()
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.sessionId is string
+        && request.resource.data.method in ['Geo', 'QR']
+        && request.resource.data.timestamp is timestamp;
+      
+      // Prevent updates and deletes (immutable once recorded)
+      allow update: if false;
+      allow delete: if false;
+    }
+    
+    // ===========================
+    // Deny all other access
+    // ===========================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

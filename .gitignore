@@ -1,0 +1,40 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Firebase
+.firebaserc
+firebase-debug.log
+
+# Node modules (if any)
+node_modules/
+package-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+
+# Logs
+npm-debug.log
+yarn-error.log
+
+# Dependencies (if using Node.js)
+/node_modules
+
+# Firebase hosting cache
+.firebase/
+
+# Local development
+localhost:*

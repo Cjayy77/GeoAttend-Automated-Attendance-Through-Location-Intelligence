@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoAttend - Student Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="navbar">
+    <div class="navbar-content">
+      <h1 class="app-title">GeoAttend</h1>
+      <div class="user-info">
+        <div>
+          <span id="studentName">Loading...</span>
+          <span id="studentLevel" class="level-badge">Level</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-secondary">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="student-layout">
+    <!-- Main Content -->
+    <main class="student-main-content">
+      <!-- No Active Session -->
+      <div id="noSessionContainer" class="card" style="display: none;">
+        <div class="no-session">
+          <h2>No Active Attendance</h2>
+          <p id="noSessionMessage">There are no active attendance sessions at the moment.</p>
+          <p>Please check back later or contact your lecturer.</p>
+          <button onclick="location.reload()" class="btn btn-primary">Refresh</button>
+        </div>
+      </div>
+
+    <!-- Geolocation Attendance -->
+    <div id="geoattendanceContainer" class="card" style="display: none;">
+      <h2>Geolocation Attendance</h2>
+      <div class="session-info">
+        <p><strong>Session ID:</strong> <span id="sessionIdGeo">-</span></p>
+        <p><strong>Lecturer:</strong> <span id="lecturerNameGeo">-</span></p>
+        <p><strong>Method:</strong> Geolocation-based</p>
+      </div>
+
+      <div class="geo-status-section">
+        <h3>Location Status</h3>
+        <div id="geoStatus" class="geo-status">Requesting location...</div>
+        <p class="small-text">
+          The system is checking your distance from the attendance point.
+        </p>
+        <p class="small-text">
+          You will be marked present automatically when you are within the attendance radius.
+        </p>
+      </div>
+
+      <div class="loading-indicator">
+        <div class="spinner-small"></div>
+        <p>Waiting for attendance...</p>
+      </div>
+    </div>
+
+    <!-- QR-Only Attendance -->
+    <div id="qrOnlyContainer" class="card" style="display: none;">
+      <h2>QR Code Attendance</h2>
+      <div class="session-info">
+        <p><strong>Session ID:</strong> <span id="sessionIdQR">-</span></p>
+        <p><strong>Lecturer:</strong> <span id="lecturerNameQR">-</span></p>
+        <p><strong>Method:</strong> QR Code-based</p>
+      </div>
+
+      <div class="qr-section">
+        <h3>Scan QR Code</h3>
+        <p>Ask your lecturer for the QR code and scan it to mark your attendance.</p>
+        <button id="scanQRBtn" class="btn btn-primary">Scan QR Code</button>
+        <p class="small-text">
+          Or if scanning doesn't work on your device, you can manually enter the session ID.
+        </p>
+      </div>
+    </div>
+
+    <!-- Attendance Recorded -->
+    <div id="attendanceRecordedContainer" class="card" style="display: none;">
+      <div class="success-box">
+        <h2>✓ Attendance Recorded</h2>
+        <p><strong>Method:</strong> <span id="recordedMethod">-</span></p>
+        <p><strong>Time:</strong> <span id="recordedTime">-</span></p>
+        <p>Your attendance has been successfully recorded.</p>
+        <button onclick="location.reload()" class="btn btn-primary">Return to Dashboard</button>
+      </div>
+    </div>
+
+    <!-- Quick QR Code Scanner (Always Available) -->
+    <div id="quickQRContainer" class="card">
+      <h3>Quick QR Code Scanner</h3>
+      <p class="small-text">You can scan a QR code anytime using the button below, regardless of the current attendance method.</p>
+      <button id="quickScanQRBtn" class="btn btn-primary">📱 Scan QR Code</button>
+    </div>
+    </main>
+
+    <!-- Attendance History Sidebar -->
+    <aside class="student-sidebar">
+      <div class="sidebar-header">
+        <h3>Attended Courses</h3>
+      </div>
+      <div id="attendanceHistoryList" class="attendance-history-list">
+        <p class="empty-text">No attendance records yet</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Error Message -->
+  <div id="errorMessage" class="error-message"></div>
+
+  <!-- Success Message -->
+  <div id="successMessage" class="success-message"></div>
+
+  <!-- QR Scanner Modal -->
+  <div id="qrScannerModal" class="modal" style="display: none;">
+    <div class="modal-content scanner-modal">
+      <div class="modal-header">
+        <h2>Scan QR Code</h2>
+        <button class="modal-close" onclick="closeQRScanner()">&times;</button>
+      </div>
+      <div id="qr_reader" style="width: 100%; margin: 20px 0;"></div>
+      <div class="scanner-info">
+        <p>Point your camera at the QR code displayed by your lecturer.</p>
+        <p class="small-text">Make sure the code is clearly visible in the frame.</p>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn btn-secondary" onclick="closeQRScanner()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div id="loadingSpinner" style="display: none;">
+    <div class="spinner"></div>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script type="module">
+    import { initStudentDashboard, setupQRScanning } from './js/student.js';
+    import { auth, db } from './js/firebase.js';
+    import { getDoc, doc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+    let dashboardInitialized = false;
+    console.log('[Student] Page loaded');
+
+    // Single initialization on page load
+    async function initDashboard() {
+      console.log('[Student] Initializing...');
+      
+      if (dashboardInitialized) {
+        console.log('[Student] Already initialized');
+        return;
+      }
+      
+      // Wait for auth to be ready
+      await new Promise(resolve => {
+        const unsubscribe = auth.onAuthStateChanged(() => {
+          unsubscribe();
+          resolve();
+        });
+      });
+      
+      const user = auth.currentUser;
+      console.log('[Student] Current user:', user?.uid);
+      
+      if (!user) {
+        console.log('[Student] No user, redirecting');
+        window.location.href = '/';
+        return;
+      }
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const role = userDoc.data()?.role;
+        console.log('[Student] User role:', role);
+        
+        if (role === 'lecturer') {
+          console.log('[Student] Wrong role, redirecting to lecturer');
+          window.location.href = '/lecturer.html';
+          return;
+        }
+      } catch (error) {
+        console.error('[Student] Role check error:', error);
+        // Continue anyway
+      }
+
+      dashboardInitialized = true;
+      console.log('[Student] Initializing dashboard');
+      await initStudentDashboard();
+      console.log('[Student] Dashboard ready');
+    }
+
+    // Start immediately
+    initDashboard().catch(err => console.error('[Student] Init error:', err));
+
+    // Global function to close QR scanner
+    window.closeQRScanner = function() {
+      const modal = document.getElementById('qrScannerModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    };
+  </script>
+</body>
+</html>

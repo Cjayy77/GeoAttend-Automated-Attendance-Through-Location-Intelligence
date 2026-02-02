@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoAttend - Quick Start</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+    
+    h1 {
+      color: #3498db;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    
+    h2 {
+      color: #2c3e50;
+      margin: 30px 0 15px 0;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 10px;
+    }
+    
+    h3 {
+      color: #34495e;
+      margin: 20px 0 10px 0;
+    }
+    
+    p, li {
+      color: #555;
+      line-height: 1.8;
+      margin-bottom: 10px;
+    }
+    
+    ol, ul {
+      margin-left: 20px;
+      margin-bottom: 15px;
+    }
+    
+    code {
+      background: #ecf0f1;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      color: #c0392b;
+    }
+    
+    .code-block {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+    
+    .warning {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+    }
+    
+    .success {
+      background: #d4edda;
+      border-left: 4px solid #28a745;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+    }
+    
+    .note {
+      background: #d1ecf1;
+      border-left: 4px solid #17a2b8;
+      padding: 15px;
+      border-radius: 6px;
+      margin: 15px 0;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+    }
+    
+    table th, table td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: left;
+    }
+    
+    table th {
+      background: #ecf0f1;
+      font-weight: 600;
+    }
+    
+    .step {
+      background: #f8f9fa;
+      padding: 15px;
+      border-left: 4px solid #3498db;
+      margin: 15px 0;
+      border-radius: 4px;
+    }
+    
+    .btn {
+      display: inline-block;
+      background: #3498db;
+      color: white;
+      padding: 12px 25px;
+      border-radius: 6px;
+      text-decoration: none;
+      margin-top: 10px;
+      transition: background 0.2s;
+    }
+    
+    .btn:hover {
+      background: #2980b9;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎯 GeoAttend Quick Start Guide</h1>
+    
+    <h2>What is GeoAttend?</h2>
+    <p>
+      GeoAttend is a web-based attendance system that allows lecturers to create attendance sessions 
+      using either geolocation or QR codes. Students can quickly mark their attendance based on their 
+      proximity to the lecturer or by scanning a QR code.
+    </p>
+    
+    <h2>5-Minute Setup</h2>
+    
+    <div class="step">
+      <h3>Step 1: Create Firebase Project (2 minutes)</h3>
+      <ol>
+        <li>Visit <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a></li>
+        <li>Click "Add project"</li>
+        <li>Name it "GeoAttend"</li>
+        <li>Follow the wizard</li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3>Step 2: Enable Authentication</h3>
+      <ol>
+        <li>Go to <strong>Authentication</strong> in left sidebar</li>
+        <li>Click <strong>Sign-in method</strong></li>
+        <li>Enable <strong>Email/Password</strong></li>
+        <li>Click <strong>Save</strong></li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3>Step 3: Create Firestore Database</h3>
+      <ol>
+        <li>Go to <strong>Firestore Database</strong> in left sidebar</li>
+        <li>Click <strong>Create database</strong></li>
+        <li>Choose <strong>Production mode</strong></li>
+        <li>Select your region</li>
+        <li>Click <strong>Enable</strong></li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3>Step 4: Get Your Config</h3>
+      <ol>
+        <li>Click the gear icon (⚙️) at top-left → <strong>Project Settings</strong></li>
+        <li>Find your app in the "Your apps" section</li>
+        <li>If no app, click <strong>Add app</strong> → <strong>Web</strong></li>
+        <li>Copy the entire config object</li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3>Step 5: Add Security Rules</h3>
+      <ol>
+        <li>Go back to <strong>Firestore Database</strong></li>
+        <li>Click the <strong>Rules</strong> tab</li>
+        <li>Copy all content from <code>FIRESTORE_RULES.txt</code> in your project</li>
+        <li>Paste it here (replace everything)</li>
+        <li>Click <strong>Publish</strong></li>
+      </ol>
+    </div>
+    
+    <div class="step">
+      <h3>Step 6: Update Your Config</h3>
+      <ol>
+        <li>Open the file <code>js/firebase.js</code></li>
+        <li>Find this section:
+          <div class="code-block">
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  ...
+};
+          </div>
+        </li>
+        <li>Replace all the values with your actual Firebase config from Step 4</li>
+        <li>Save the file</li>
+      </ol>
+    </div>
+    
+    <h2>Testing Locally</h2>
+    
+    <h3>Option A: Using Python (Recommended for beginners)</h3>
+    <p>If you have Python installed:</p>
+    <div class="code-block">
+cd /path/to/GeoAttend
+python -m http.server 8000
+    </div>
+    <p>Then open <code>http://localhost:8000</code> in your browser</p>
+    
+    <h3>Option B: Using Node.js</h3>
+    <div class="code-block">
+npm install -g http-server
+cd /path/to/GeoAttend
+http-server
+    </div>
+    
+    <h3>Option C: Using VS Code Live Server</h3>
+    <ol>
+      <li>Install "Live Server" extension in VS Code</li>
+      <li>Right-click <code>index.html</code></li>
+      <li>Select "Open with Live Server"</li>
+    </ol>
+    
+    <div class="warning">
+      <strong>⚠️ Important:</strong> Geolocation API requires HTTPS in production. 
+      Using localhost:8000 is fine for testing.
+    </div>
+    
+    <h2>First Test Run</h2>
+    
+    <h3>Create Test Accounts</h3>
+    
+    <table>
+      <tr>
+        <th>Role</th>
+        <th>Email</th>
+        <th>Password</th>
+      </tr>
+      <tr>
+        <td>Lecturer</td>
+        <td>lecturer@test.com</td>
+        <td>Password123</td>
+      </tr>
+      <tr>
+        <td>Student</td>
+        <td>student@test.com</td>
+        <td>Password123</td>
+      </tr>
+    </table>
+    
+    <h3>Testing Workflow</h3>
+    
+    <div class="step">
+      <h4>1. Lecturer Creates Session</h4>
+      <ul>
+        <li>Login as lecturer</li>
+        <li>Set radius to 50 meters</li>
+        <li>Set duration to 5 minutes</li>
+        <li>Click "Start Session"</li>
+        <li>Allow location access</li>
+      </ul>
+    </div>
+    
+    <div class="step">
+      <h4>2. Student Marks Attendance</h4>
+      <ul>
+        <li>Open new browser tab/window</li>
+        <li>Login as student</li>
+        <li>If geolocation enabled: System automatically detects if within range</li>
+        <li>If QR-only: Click "Scan QR Code" and enter the session ID from lecturer's page</li>
+      </ul>
+    </div>
+    
+    <div class="step">
+      <h4>3. View Results</h4>
+      <ul>
+        <li>Check lecturer's dashboard</li>
+        <li>Student should appear in the attendance list</li>
+        <li>Shows name, level, method (Geo or QR), and time</li>
+      </ul>
+    </div>
+    
+    <h2>Deployment</h2>
+    
+    <h3>Deploy to Firebase Hosting</h3>
+    
+    <div class="code-block">
+npm install -g firebase-tools
+firebase login
+firebase init hosting
+firebase deploy
+    </div>
+    
+    <p>Your app will be live at: <code>https://YOUR-PROJECT-ID.web.app</code></p>
+    
+    <h3>Deploy to Vercel</h3>
+    
+    <ol>
+      <li>Push your project to GitHub</li>
+      <li>Go to <a href="https://vercel.com" target="_blank">vercel.com</a></li>
+      <li>Click "New Project"</li>
+      <li>Import your GitHub repo</li>
+      <li>Deploy (takes 1-2 minutes)</li>
+    </ol>
+    
+    <div class="success">
+      <strong>✅ Done!</strong> Your app is now live at your Vercel or Firebase URL
+    </div>
+    
+    <h2>Troubleshooting</h2>
+    
+    <h3>Problem: "Invalid Firebase Config"</h3>
+    <p><strong>Solution:</strong> Make sure you copied the ENTIRE config object from Firebase Console, 
+    including all fields (apiKey, authDomain, projectId, etc.)</p>
+    
+    <h3>Problem: Geolocation not working</h3>
+    <p><strong>Solution:</strong> 
+      <ul>
+        <li>Check browser permissions (usually a popup)</li>
+        <li>Must use HTTPS (localhost ok, but production needs HTTPS)</li>
+        <li>Try QR-only mode as backup</li>
+      </ul>
+    </p>
+    
+    <h3>Problem: Students don't appear in attendance list</h3>
+    <p><strong>Solution:</strong> 
+      <ul>
+        <li>Verify Firestore rules were published</li>
+        <li>Check browser console for errors (F12)</li>
+        <li>Ensure student is within radius if using geolocation</li>
+      </ul>
+    </p>
+    
+    <h3>Problem: "Permission denied" on Firestore</h3>
+    <p><strong>Solution:</strong> Make sure you published the security rules to Firestore</p>
+    
+    <h2>Next Steps</h2>
+    
+    <ul>
+      <li>📚 Read <code>README.md</code> for detailed documentation</li>
+      <li>🔒 Review <code>FIRESTORE_RULES.txt</code> to understand security</li>
+      <li>📱 Test on mobile device for accurate geolocation</li>
+      <li>🎨 Customize styles in <code>css/style.css</code></li>
+      <li>🚀 Deploy to production with HTTPS</li>
+    </ul>
+    
+    <h2>Support Resources</h2>
+    
+    <ul>
+      <li><a href="https://firebase.google.com/docs" target="_blank">Firebase Documentation</a></li>
+      <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API" target="_blank">Geolocation API Docs</a></li>
+      <li><a href="https://qrserver.com/" target="_blank">QR Code Library Docs</a></li>
+      <li>Check browser console (F12) for error messages</li>
+    </ul>
+    
+    <hr style="margin: 40px 0; border: none; border-top: 1px solid #eee;">
+    
+    <p style="text-align: center; color: #999; font-size: 14px;">
+      GeoAttend v1.0 | © 2026 | Ready for production deployment
+    </p>
+  </div>
+</body>
+</html>
