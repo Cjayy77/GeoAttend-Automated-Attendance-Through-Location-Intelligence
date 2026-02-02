@@ -10,12 +10,14 @@ import {
   getDocs,
   serverTimestamp,
   Timestamp,
-  deleteDoc
+  updateDoc,
+  arrayUnion
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
 let attendanceRecorded = false;
 let pollingInterval = null;
 let currentSession = null;
+let lastSessionId = null;
 let studentInitialized = false;
 let currentGeolocationTimeout = null;
 
@@ -138,9 +140,19 @@ async function checkForActiveSession(user, userProfile) {
       ...sessionData
     };
 
-    // CRITICAL FIX: Reset attendanceRecorded for NEW SESSION to prevent ghost attendance
-    attendanceRecorded = false;
-    console.log('[Student] New session loaded, attendanceRecorded reset to false');
+    console.log("SESSION RECEIVED:", {
+      latitude: typeof currentSession.latitude, latitude: currentSession.latitude,
+      longitude: typeof currentSession.longitude, longitude: currentSession.longitude,
+      radius: typeof currentSession.radius, radius: currentSession.radius,
+      geoEnabled: currentSession.geoEnabled
+    });
+
+    // FIX STUCK attendanceRecorded STATE - Reset for new session
+    if (currentSession.id !== lastSessionId) {
+      attendanceRecorded = false;
+      lastSessionId = currentSession.id;
+      console.log('[Student] New session detected, attendanceRecorded reset to false');
+    }
 
     // Check if already attended this session
     const attendanceQuery = query(
@@ -189,6 +201,15 @@ function startGeolocationPolling(user, userProfile) {
 
   console.log('[Geolocation] User clicked START ATTENDANCE - requesting geolocation permission');
   updateGeoStatus('Requesting location...');
+
+  // FAIL-SAFE UI EXIT - Add timeout protection to prevent infinite spinner
+  setTimeout(() => {
+    if (!attendanceRecorded) {
+      hideSpinner();
+      updateGeoStatus("Unable to confirm attendance. Try again.");
+      console.log("[ATTENDANCE DEBUG] Fail-safe timeout triggered - spinner hidden.");
+    }
+  }, 15000);
 
   // Request permission explicitly (especially for iOS) - triggered by user click
   requestGeolocationPermissionWithFallback(user, userProfile, isRestrictedBrowser);
@@ -258,12 +279,53 @@ function requestLocationAndMarkAttendance(user, userProfile) {
         currentSession.longitude
       );
 
-      console.log('[Geolocation] Position received: distance=', distance.toFixed(2), 'radius=', currentSession.radius);
-      updateGeoStatus(`Distance: ${distance.toFixed(2)}m (Radius: ${currentSession.radius}m)`);
+      // HARDEN RADIUS CHECK - Prevent NaN & Type Bugs
+      const radius = Number(currentSession.radius);
+      const validCoords =
+        typeof currentSession.latitude === "number" &&
+        typeof currentSession.longitude === "number";
 
-      if (distance <= currentSession.radius && !attendanceRecorded) {
-        console.log('[Geolocation] Within radius! Marking attendance.');
-        markAttendance(user, userProfile, 'Geo');
+      const validDistance = typeof distance === "number" && !Number.isNaN(distance);
+
+      console.log("[ATTENDANCE DEBUG] distance:", distance);
+      console.log("[ATTENDANCE DEBUG] radius:", radius);
+      console.log("[ATTENDANCE DEBUG] validCoords:", validCoords);
+      console.log("[ATTENDANCE DEBUG] attendanceRecorded:", attendanceRecorded);
+
+      if (!validCoords) {
+        updateGeoStatus("Session is not configured for geolocation.");
+        stopGeoPolling();
+        return;
+      }
+
+      if (!validDistance || Number.isNaN(radius)) {
+        updateGeoStatus("Location data invalid. Retry.");
+        return;
+      }
+
+      console.log('[Geolocation] Position received: distance=', distance.toFixed(2), 'radius=', radius);
+      updateGeoStatus(`Distance: ${distance.toFixed(2)}m (Radius: ${radius}m)`);
+
+      // COMPREHENSIVE GATE CHECK FOR ATTENDANCE STALL
+      console.log("ATTENDANCE GATE CHECK", {
+        distance: distance.toFixed(2),
+        radius: currentSession.radius,
+        radiusType: typeof currentSession.radius,
+        distanceCheck: distance <= radius,
+        distanceCheckResult: distance <= radius ? "✓ PASS" : "✗ FAIL",
+        attendanceRecorded: attendanceRecorded,
+        attendanceRecordedType: typeof attendanceRecorded,
+        geoEnabled: currentSession.geoEnabled,
+        latitude: currentSession.latitude,
+        latType: typeof currentSession.latitude,
+        longitude: currentSession.longitude,
+        lngType: typeof currentSession.longitude,
+        willCallMarkAttendance: distance <= radius && attendanceRecorded === false
+      });
+
+      if (distance <= radius && attendanceRecorded === false) {
+        console.log("[ATTENDANCE DEBUG] Inside radius. Proceeding to mark attendance.");
+        markAttendance(user, userProfile, "Geo");
       }
     },
     (error) => {
@@ -325,10 +387,6 @@ function updateGeoStatus(message) {
   }
 }
 
-/**
- * Haversine formula to calculate distance between two coordinates
- * Returns distance in meters
- */
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371000; // Earth's radius in meters
   const φ1 = (lat1 * Math.PI) / 180;
@@ -344,16 +402,46 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+/**
+ * Stop geolocation polling and clean up interval
+ */
+function stopGeoPolling() {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+    console.log("[ATTENDANCE DEBUG] Polling stopped.");
+  }
+}
+
+/**
+ * Hide the waiting attendance spinner
+ */
+function hideSpinner() {
+  const loadingIndicator = document.getElementById('geoLoadingIndicator');
+  if (loadingIndicator) {
+    loadingIndicator.style.display = 'none';
+    console.log("[ATTENDANCE DEBUG] Spinner hidden.");
+  }
+}
+
 async function markAttendance(user, userProfile, method) {
   try {
-    if (attendanceRecorded) return;
+    console.log("MARK ATTENDANCE CALLED", {
+      userId: user.uid,
+      method: method,
+      sessionId: currentSession?.id,
+      attendanceRecorded: attendanceRecorded
+    });
+
+    if (attendanceRecorded) {
+      console.log("[ATTENDANCE] Already marked, returning early");
+      return;
+    }
 
     attendanceRecorded = true;
 
     // Stop polling if geolocation
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-    }
+    stopGeoPolling();
 
     // Write attendance record
     const attendanceData = {
@@ -367,10 +455,20 @@ async function markAttendance(user, userProfile, method) {
 
     // Use composite doc ID to prevent duplicates
     const docId = `${currentSession.id}_${user.uid}`;
+    
+    console.log("[ATTENDANCE DEBUG] Writing attendance to Firestore...");
+    
     await addDoc(collection(db, 'attendance'), {
       ...attendanceData,
       _docId: docId // Add reference for duplicate prevention
     });
+
+    console.log("[ATTENDANCE DEBUG] Firestore write SUCCESS.");
+    
+    // Stop polling and hide spinner after success
+    stopGeoPolling();
+    hideSpinner();
+    updateGeoStatus("Attendance recorded successfully.");
 
     showAttendanceRecordedUI(method);
     
@@ -380,7 +478,9 @@ async function markAttendance(user, userProfile, method) {
     }, 1500);
   } catch (error) {
     attendanceRecorded = false;
-    if (pollingInterval) clearInterval(pollingInterval);
+    stopGeoPolling();
+    console.error("[ATTENDANCE DEBUG] Firestore write FAILED:", error);
+    hideSpinner();
     showError('Failed to record attendance: ' + error.message);
   }
 }
@@ -788,6 +888,22 @@ async function loadAttendanceHistory(studentId) {
     // Fetch session details for each attendance record
     for (const attendanceDoc of attendanceSnapshot.docs) {
       const attendanceData = attendanceDoc.data();
+      
+      // Log first record for diagnostic purposes
+      if (attendanceSnapshot.docs.indexOf(attendanceDoc) === 0) {
+        console.log("ATTENDANCE DOC SNAPSHOT (first record):", {
+          docId: attendanceDoc.id,
+          studentId: attendanceData.studentId,
+          loggedInUser: studentId,
+          studentIdMatch: attendanceData.studentId === studentId,
+          hiddenBy: attendanceData.hiddenBy || undefined,
+          hiddenByType: typeof attendanceData.hiddenBy,
+          hiddenByArray: Array.isArray(attendanceData.hiddenBy),
+          allFields: Object.keys(attendanceData),
+          data: attendanceData
+        });
+      }
+      
       const sessionDoc = await getDocs(
         query(
           collection(db, 'sessions'),
@@ -829,12 +945,24 @@ function displayAttendanceHistory(records) {
   const container = document.getElementById('attendanceHistoryList');
   container.innerHTML = '';
 
-  if (records.length === 0) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  // Filter out records hidden by current user
+  const visibleRecords = records.filter(record => {
+    if (record.hiddenBy && record.hiddenBy.includes(user.uid)) {
+      console.log('[Student] Skipping hidden record:', record.id);
+      return false;
+    }
+    return true;
+  });
+
+  if (visibleRecords.length === 0) {
     container.innerHTML = '<p class="empty-text">No attendance records yet</p>';
     return;
   }
 
-  records.forEach(record => {
+  visibleRecords.forEach(record => {
     const item = createAttendanceHistoryItem(record);
     container.appendChild(item);
   });
@@ -863,29 +991,46 @@ function createAttendanceHistoryItem(record) {
     </button>
   `;
 
-  // Add delete button handler
-  const deleteBtn = item.querySelector('.history-item-delete');
-  deleteBtn.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to delete this attendance record?')) {
-      await deleteAttendanceRecord(record.id);
+  // Add hide button handler
+  const hideBtn = item.querySelector('.history-item-delete');
+  hideBtn.addEventListener('click', async () => {
+    if (confirm('Hide this attendance record from your dashboard?')) {
+      await hideAttendanceRecord(record.id);
     }
   });
 
   return item;
 }
 
-async function deleteAttendanceRecord(recordId) {
+async function hideAttendanceRecord(recordId) {
   try {
     showLoading(true);
-    await deleteDoc(doc(db, 'attendance', recordId));
-    showLoading(false);
-    showSuccess('Attendance record deleted');
-    // Reload history
     const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    
+    console.log('HIDE ATTENDANCE WRITE ATTEMPT', {
+      docId: recordId,
+      user: user.uid,
+      operation: 'arrayUnion'
+    });
+    
+    await updateDoc(doc(db, 'attendance', recordId), {
+      hiddenBy: arrayUnion(user.uid)
+    });
+    
+    showLoading(false);
+    showSuccess('Attendance record hidden from your dashboard');
+    console.log('[Student] Record hidden successfully');
+    
+    // Reload history
     await loadAttendanceHistory(user.uid);
   } catch (error) {
     showLoading(false);
-    showError('Failed to delete record: ' + error.message);
+    console.error('HIDE ATTENDANCE FAILED:', error.code, error.message);
+    console.error('[Student] Full error:', error);
+    showError('Failed to hide record: ' + error.message);
   }
 }
 

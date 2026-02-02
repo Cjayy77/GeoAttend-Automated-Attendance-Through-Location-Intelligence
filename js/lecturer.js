@@ -548,7 +548,27 @@ async function createSession(user, radius, duration, latitude, longitude, qrOnly
       attendanceCount: 0
     };
 
+    console.log("SESSION BEING SAVED:", {
+      latitude: typeof latitude, latitude,
+      longitude: typeof longitude, longitude,
+      radius: typeof radius, radius,
+      geoEnabled: sessionData.geoEnabled
+    });
+
+    console.log("SESSION WRITE ATTEMPT", {
+      authUid: auth.currentUser.uid,
+      authUidType: typeof auth.currentUser.uid,
+      lecturerId: sessionData.lecturerId,
+      lecturerIdType: typeof sessionData.lecturerId,
+      radiusType: typeof sessionData.radius,
+      radiusValue: sessionData.radius,
+      geoEnabled: sessionData.geoEnabled,
+      qrOnly: sessionData.qrOnly,
+      sessionDataKeys: Object.keys(sessionData)
+    });
+
     const docRef = await addDoc(collection(db, 'sessions'), sessionData);
+    console.log('[Lecturer] SESSION WRITE SUCCESS, ID:', docRef.id);
     const sessionId = docRef.id;
     
     console.log('[Lecturer] Session created with ID:', sessionId);
@@ -568,7 +588,8 @@ async function createSession(user, radius, duration, latitude, longitude, qrOnly
     setupAttendanceListener(sessionId);
     showSuccess('Session started successfully!');
   } catch (error) {
-    console.error('[Lecturer] ERROR creating session:', error?.message);
+    console.error('SESSION WRITE FAILED:', error.code, error.message);
+    console.error('[Lecturer] Full error:', error);
     showLoading(false);
     // Only show user-friendly message, not technical errors
     showError('Failed to start session. Please check your settings and try again.');

@@ -45,11 +45,26 @@ export async function registerUser(email, password, name, role, level = null) {
       userData.level = level;
     }
 
+    console.log("SIGNUP PROFILE WRITE ATTEMPT", {
+      uid: user.uid,
+      authUid: auth.currentUser?.uid,
+      role: userData.role,
+      roleType: typeof userData.role,
+      email: userData.email,
+      emailType: typeof userData.email,
+      name: userData.name,
+      nameType: typeof userData.name,
+      level: userData.level,
+      data: userData
+    });
+
     await setDoc(doc(db, 'users', user.uid), userData);
+    console.log("[AUTH] Signup profile write SUCCESS");
 
     return user;
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('SIGNUP PROFILE WRITE FAILED:', error.code, error.message);
+    console.error('[AUTH] Full error:', error);
     throw error;
   }
 }
