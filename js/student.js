@@ -17,6 +17,31 @@ let attendanceRecorded = false;
 let pollingInterval = null;
 let currentSession = null;
 let studentInitialized = false;
+let currentGeolocationTimeout = null;
+
+// Device and browser detection
+const deviceInfo = {
+  isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
+  isAndroid: /Android/.test(navigator.userAgent),
+  isMobile: /iPad|iPhone|iPod|Android/.test(navigator.userAgent),
+  isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
+  isChrome: /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor),
+  isFirefox: /Firefox/.test(navigator.userAgent),
+  isEdge: /Edg/.test(navigator.userAgent),
+  isWebView: /AppleWebKit/.test(navigator.userAgent) && /Version/.test(navigator.userAgent) && !/Safari/.test(navigator.userAgent)
+};
+
+console.log('[Device] Detection:', {
+  isIOS: deviceInfo.isIOS,
+  isAndroid: deviceInfo.isAndroid,
+  isMobile: deviceInfo.isMobile,
+  isSafari: deviceInfo.isSafari,
+  isChrome: deviceInfo.isChrome,
+  isFirefox: deviceInfo.isFirefox,
+  isEdge: deviceInfo.isEdge,
+  isWebView: deviceInfo.isWebView,
+  userAgent: navigator.userAgent
+});
 
 // Initialize student dashboard
 export async function initStudentDashboard() {
@@ -49,8 +74,14 @@ export async function initStudentDashboard() {
   document.getElementById('studentName').textContent = userProfile.name;
   document.getElementById('studentLevel').textContent = userProfile.level;
 
-  // Set up logout
+  // Set up logout - RESET MODULE STATE for next login
   document.getElementById('logoutBtn').addEventListener('click', async () => {
+    attendanceRecorded = false;
+    studentInitialized = false;
+    currentSession = null;
+    if (pollingInterval) clearInterval(pollingInterval);
+    if (currentGeolocationTimeout) clearTimeout(currentGeolocationTimeout);
+    console.log('[Student] Module state reset before logout');
     await logoutUser();
     window.location.href = '/';
   });
@@ -80,13 +111,36 @@ async function checkForActiveSession(user, userProfile) {
       return;
     }
 
-    // Get the first active session
-    const sessionDoc = snapshot.docs[0];
-    const sessionData = sessionDoc.data();
+    // Filter out expired sessions (endTime has passed)
+    const now = new Date();
+    let validSession = null;
+    for (const sessionDoc of snapshot.docs) {
+      const sessionData = sessionDoc.data();
+      const endTime = sessionData.endTime?.toDate?.() || new Date(sessionData.endTime);
+      if (endTime > now) {
+        validSession = sessionDoc;
+        break;
+      } else {
+        console.warn('[Student] Session expired:', sessionDoc.id, 'endTime:', endTime);
+      }
+    }
+
+    if (!validSession) {
+      showLoading(false);
+      showNoSessionUI();
+      return;
+    }
+
+    // Get the first active, non-expired session
+    const sessionData = validSession.data();
     currentSession = {
-      id: sessionDoc.id,
+      id: validSession.id,
       ...sessionData
     };
+
+    // CRITICAL FIX: Reset attendanceRecorded for NEW SESSION to prevent ghost attendance
+    attendanceRecorded = false;
+    console.log('[Student] New session loaded, attendanceRecorded reset to false');
 
     // Check if already attended this session
     const attendanceQuery = query(
@@ -97,15 +151,16 @@ async function checkForActiveSession(user, userProfile) {
 
     const attendanceSnapshot = await getDocs(attendanceQuery);
     attendanceRecorded = !attendanceSnapshot.empty;
+    console.log('[Student] Attendance check:', attendanceRecorded ? 'Already attended' : 'Not attended yet');
 
     showLoading(false);
 
     if (attendanceRecorded) {
       showAlreadyAttendedUI();
     } else if (currentSession.geoEnabled) {
-      // Start geolocation polling
+      // Show geolocation UI with START ATTENDANCE button - DO NOT auto-start
       showGeoattendanceUI(user, userProfile);
-      startGeolocationPolling(user, userProfile);
+      console.log('[Geolocation] Session has geolocation enabled - waiting for user to start attendance');
     } else if (currentSession.qrOnly) {
       showQROnlyUI();
     }
@@ -115,12 +170,71 @@ async function checkForActiveSession(user, userProfile) {
   }
 }
 
+// This is now called ONLY from button click handler, not auto-triggered
 function startGeolocationPolling(user, userProfile) {
   if (!navigator.geolocation) {
-    showError('Geolocation is not supported by your browser');
+    console.error('[Geolocation] NOT SUPPORTED by browser');
+    showError('Geolocation is not supported by your browser. Using QR code instead.');
+    showQROnlyUI();
     return;
   }
 
+  // iOS non-Safari browsers have restricted geolocation but we still try
+  let isRestrictedBrowser = false;
+  if (deviceInfo.isIOS && !deviceInfo.isSafari) {
+    console.warn('[Geolocation] iOS non-Safari browser detected (Chrome, Firefox, Edge on iOS)');
+    console.warn('[Geolocation] These browsers have restricted geolocation access on iOS - will show warning after timeout');
+    isRestrictedBrowser = true;
+  }
+
+  console.log('[Geolocation] User clicked START ATTENDANCE - requesting geolocation permission');
+  updateGeoStatus('Requesting location...');
+
+  // Request permission explicitly (especially for iOS) - triggered by user click
+  requestGeolocationPermissionWithFallback(user, userProfile, isRestrictedBrowser);
+}
+
+function requestGeolocationPermissionWithFallback(user, userProfile, isRestrictedBrowser) {
+  console.log('[Geolocation] Requesting permission from user' + (isRestrictedBrowser ? ' (restricted browser)' : ''));
+  
+  // Make the actual request - browser will show permission dialog
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      console.log('[Geolocation] Permission granted, starting polling');
+      // Permission granted, start polling
+      startGeolocationPollingInternal(user, userProfile);
+    },
+    (error) => {
+      console.error('[Geolocation] Permission request error:', error.code, error.message);
+      
+      // On iOS non-Safari, even "success" may return cached data
+      // So we should not rely on geolocation alone
+      if (error.code === error.PERMISSION_DENIED) {
+        console.warn('[Geolocation] PERMISSION DENIED by user on first request');
+        updateGeoStatus('❌ Location access denied. Using QR code instead.');
+        showQROnlyUI();
+      } else if (isRestrictedBrowser) {
+        // For restricted browsers, warn user but don't force QR
+        console.warn('[Geolocation] iOS non-Safari restricted access - falling back to QR');
+        updateGeoStatus('⚠️ Location access limited. Use QR code to mark attendance.');
+        showQROnlyUI();
+      } else {
+        // Try again with polling
+        console.log('[Geolocation] Attempting to start polling despite initial error');
+        startGeolocationPollingInternal(user, userProfile);
+      }
+    },
+    {
+      timeout: 8000,
+      enableHighAccuracy: false,
+      maximumAge: 5000
+    }
+  );
+}
+
+function startGeolocationPollingInternal(user, userProfile) {
+  console.log('[Geolocation] Setting up polling interval');
+  
   // Initial location request
   requestLocationAndMarkAttendance(user, userProfile);
 
@@ -131,6 +245,9 @@ function startGeolocationPolling(user, userProfile) {
 }
 
 function requestLocationAndMarkAttendance(user, userProfile) {
+  // Request location directly - rely on options.timeout only (no wrapper timeout)
+  // This prevents the dual-timeout race condition on iOS Safari
+
   navigator.geolocation.getCurrentPosition(
     (position) => {
       const { latitude, longitude } = position.coords;
@@ -141,18 +258,71 @@ function requestLocationAndMarkAttendance(user, userProfile) {
         currentSession.longitude
       );
 
-      document.getElementById('geoStatus').textContent = 
-        `Distance: ${distance.toFixed(2)}m (Radius: ${currentSession.radius}m)`;
+      console.log('[Geolocation] Position received: distance=', distance.toFixed(2), 'radius=', currentSession.radius);
+      updateGeoStatus(`Distance: ${distance.toFixed(2)}m (Radius: ${currentSession.radius}m)`);
 
       if (distance <= currentSession.radius && !attendanceRecorded) {
+        console.log('[Geolocation] Within radius! Marking attendance.');
         markAttendance(user, userProfile, 'Geo');
       }
     },
     (error) => {
-      console.warn('Geolocation error:', error);
-      showGeoStatusWarning();
+      console.error('[Geolocation] ERROR code:', error.code, 'message:', error.message);
+      
+      // Handle different error types
+      if (error.code === error.PERMISSION_DENIED) {
+        console.warn('[Geolocation] PERMISSION DENIED by user');
+        updateGeoStatus('❌ Location access denied. Using QR code instead.');
+        // Clear polling and switch to QR-only
+        if (pollingInterval) clearInterval(pollingInterval);
+        showQROnlyUI();
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        console.warn('[Geolocation] POSITION UNAVAILABLE - auto-switching to QR code');
+        updateGeoStatus('❌ Position unavailable on this device. Switching to QR code...');
+        // AUTO-FALLBACK on position unavailable (Safari on iOS returns this frequently)
+        if (pollingInterval) clearInterval(pollingInterval);
+        setTimeout(() => {
+          console.log('[Geolocation] Showing QR-only UI after position unavailable');
+          showQROnlyUI();
+        }, 500);
+      } else if (error.code === error.TIMEOUT) {
+        console.warn('[Geolocation] TIMEOUT from getCurrentPosition');
+        updateGeoStatus('⏱️ Location request timed out. Retrying...');
+        // Retry continues at next polling interval (15 seconds)
+      } else {
+        console.warn('[Geolocation] Unknown error:', error.message);
+        updateGeoStatus('❌ Location error: ' + error.message);
+      }
+    },
+    {
+      timeout: 8000,  // 8-second timeout for getCurrentPosition (iOS requirement)
+      enableHighAccuracy: false,  // Faster on mobile
+      maximumAge: 0  // CHANGED: Don't accept cached positions (prevents stale data)
     }
   );
+}
+
+function updateGeoStatus(message) {
+  // Show status section when updating status
+  const statusSection = document.getElementById('geoStatusSection');
+  const loadingIndicator = document.getElementById('geoLoadingIndicator');
+  const startBtn = document.getElementById('startAttendanceBtn');
+  
+  if (statusSection) {
+    statusSection.style.display = 'block';
+  }
+  if (loadingIndicator) {
+    loadingIndicator.style.display = 'block';
+  }
+  if (startBtn) {
+    startBtn.style.display = 'none';
+  }
+  
+  const statusEl = document.getElementById('geoStatus');
+  if (statusEl) {
+    statusEl.textContent = message;
+    statusEl.style.color = message.includes('❌') || message.includes('error') ? '#e74c3c' : '#f39c12';
+  }
 }
 
 /**
@@ -217,13 +387,36 @@ async function markAttendance(user, userProfile, method) {
 
 // Handle QR code scanning
 export function setupQRScanning() {
+  console.log('[QR] Setting up QR scanning buttons');
   const scanButton = document.getElementById('scanQRBtn');
   if (scanButton) {
     scanButton.addEventListener('click', async () => {
       if (!currentSession) {
-        console.log('[QR] No active session, showing toast');
+        console.log('[QR] No active session, showing error');
         showError('No active session at the moment. Please ask your lecturer to start a session.');
         return;
+      }
+      console.log('[QR] scanQRBtn clicked, opening scanner');
+      openQRScanner();
+    });
+  } else {
+    console.warn('[QR] scanQRBtn element not found in DOM');
+  }
+
+  // Setup QR scan button in geolocation section (fallback for when geo fails)
+  const scanGeoBtn = document.getElementById('scanQRBtnGeo');
+  if (scanGeoBtn) {
+    scanGeoBtn.addEventListener('click', async () => {
+      if (!currentSession) {
+        console.log('[QR] No active session, showing error');
+        showError('No active session at the moment. Please ask your lecturer to start a session.');
+        return;
+      }
+      console.log('[QR] scanQRBtnGeo clicked (from geo section), opening scanner');
+      // Stop polling if it was running
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        console.log('[Geolocation] Polling stopped, switching to QR');
       }
       openQRScanner();
     });
@@ -234,45 +427,97 @@ export function setupQRScanning() {
   if (quickScanBtn) {
     quickScanBtn.addEventListener('click', async () => {
       if (!currentSession) {
-        console.log('[QR] No active session, showing toast');
+        console.log('[QR] No active session (quick scan), showing error');
         showError('No active session at the moment. Please ask your lecturer to start a session.');
         return;
       }
+      console.log('[QR] quickScanQRBtn clicked, opening scanner');
       openQRScanner();
     });
+  } else {
+    console.warn('[QR] quickScanQRBtn element not found in DOM');
   }
 }
 
 let html5QrcodeScanner = null;
+let qrScannerOpen = false;
 
 function openQRScanner() {
-  console.log('[QR] Opening QR scanner');
+  // Prevent multiple simultaneous scanner opens
+  if (qrScannerOpen) {
+    console.warn('[QR] Scanner already opening, ignoring duplicate request');
+    return;
+  }
+  qrScannerOpen = true;
+
+  console.log('[QR] Opening QR scanner - device:', {
+    platform: deviceInfo.isAndroid ? 'Android' : deviceInfo.isIOS ? 'iOS' : 'Desktop',
+    browser: deviceInfo.isSafari ? 'Safari' : deviceInfo.isChrome ? 'Chrome' : deviceInfo.isFirefox ? 'Firefox' : deviceInfo.isEdge ? 'Edge' : 'Other'
+  });
+
   const modal = document.getElementById('qrScannerModal');
   if (!modal) {
-    console.error('[QR] Modal element not found');
+    console.error('[QR] FATAL: Modal element not found');
     showError('Scanner not available. Please refresh the page.');
+    qrScannerOpen = false;
     return;
   }
   
-  modal.style.display = 'flex';
-
-  // Initialize scanner
-  if (!html5QrcodeScanner) {
-    console.log('[QR] Initializing html5-qrcode library');
-    html5QrcodeScanner = new Html5Qrcode("qr_reader", {
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.QR_CODE
-      ]
-    });
+  const qrReader = document.getElementById('qr_reader');
+  if (!qrReader) {
+    console.error('[QR] FATAL: qr_reader element not found');
+    showError('Scanner component not available. Please refresh the page.');
+    qrScannerOpen = false;
+    return;
   }
 
-  // Start scanning
+  console.log('[QR] Opening modal and initializing scanner');
+  modal.style.display = 'flex';
+
+  // Clear previous content
+  qrReader.innerHTML = '';
+
+  // Initialize scanner if not already done
+  if (!html5QrcodeScanner) {
+    console.log('[QR] Creating new Html5Qrcode instance');
+    try {
+      const config = {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE
+        ]
+      };
+      
+      // Add iOS/mobile optimizations
+      if (deviceInfo.isMobile) {
+        config.willReadFrequently = true;  // iOS optimization
+      }
+      
+      // Android Chrome needs different config
+      if (deviceInfo.isAndroid && deviceInfo.isChrome) {
+        config.useBarCodeDetectorIfAvailable = true;
+      }
+
+      html5QrcodeScanner = new Html5Qrcode("qr_reader", config);
+      console.log('[QR] Html5Qrcode instance created successfully');
+    } catch (error) {
+      console.error('[QR] FATAL: Failed to create Html5Qrcode instance:', error?.message);
+      showError('Failed to initialize scanner. Please refresh the page.');
+      modal.style.display = 'none';
+      return;
+    }
+  }
+
+  console.log('[QR] Requesting camera access (this will show permission dialog on iOS)...');
+  
+  // Start scanning with proper error handling
   html5QrcodeScanner
     .start(
       { facingMode: 'environment' },
       {
         fps: 10,
-        qrbox: { width: 250, height: 250 }
+        qrbox: { width: 250, height: 250 },
+        disableFlip: false,
+        aspectRatio: 1.0
       },
       async (decodedText, decodedResult) => {
         // QR code scanned successfully
@@ -285,24 +530,58 @@ function openQRScanner() {
       }
     )
     .catch((error) => {
-      console.error('[QR] Camera access error:', error?.message);
+      console.error('[QR] CRITICAL: Camera access failed');
+      console.error('[QR] Error message:', error?.message || String(error));
+      console.error('[QR] Full error:', error);
+      
+      // Check if it's a permission error
+      const errorStr = String(error).toLowerCase();
+      const isPermissionError = errorStr.includes('permission') || 
+                                errorStr.includes('denied') || 
+                                errorStr.includes('notallowed') ||
+                                errorStr.includes('user denied') ||
+                                errorStr.includes('not allowed');
+      
+      console.log('[QR] Is permission error:', isPermissionError);
+      console.log('[QR] Device/Browser:', deviceInfo);
+      
       // Show manual entry option instead
       const qrContainer = document.getElementById('qr_reader');
       if (qrContainer) {
+        let instructionText = '';
+        
+        if (isPermissionError) {
+          if (deviceInfo.isIOS && !deviceInfo.isSafari) {
+            instructionText = 'Please enable camera access:<br/>Settings > ' + document.title + ' > Camera';
+          } else if (deviceInfo.isIOS) {
+            instructionText = 'Please enable camera access:<br/>Settings > Safari > Camera';
+          } else if (deviceInfo.isAndroid) {
+            instructionText = 'Please enable camera access in app settings';
+          } else {
+            instructionText = 'Please enable camera access in browser settings';
+          }
+        } else {
+          instructionText = 'You can manually enter the Session ID below:';
+        }
+        
         qrContainer.innerHTML = `
           <div style="padding: 20px; text-align: center;">
-            <p style="color: #c33; margin-bottom: 16px;">📷 Camera not available on this device</p>
-            <p style="margin-bottom: 16px;">You can manually enter the Session ID below:</p>
+            <p style="color: #c33; margin-bottom: 16px;">📷 Camera not available</p>
+            <p style="margin-bottom: 16px;">
+              ${instructionText}
+            </p>
             <input type="text" id="manualSessionId" placeholder="Enter Session ID" 
                    style="padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100%; font-size: 14px; margin-bottom: 12px;">
             <button onclick="submitManualSessionId()" class="btn btn-primary" style="width: 100%;">Submit</button>
           </div>
         `;
+        showError('Camera access failed. Please use manual entry.');
       }
     });
 }
 
 function closeQRScannerInternal() {
+  qrScannerOpen = false;
   if (html5QrcodeScanner) {
     html5QrcodeScanner.stop().then(() => {
       const modal = document.getElementById('qrScannerModal');
@@ -311,9 +590,13 @@ function closeQRScannerInternal() {
       }
     }).catch((error) => {
       console.error('Error stopping scanner:', error);
+      qrScannerOpen = false;
     });
   }
 }
+
+// Export for use in HTML
+export { closeQRScannerInternal };
 
 async function handleQRCodeScanned(decodedText) {
   console.log('[QR] Handling scanned code:', decodedText);
@@ -377,14 +660,35 @@ window.submitManualSessionId = async function() {
   const sessionId = input?.value?.trim();
   
   if (!sessionId) {
-    console.warn('[QR] WARN: Empty session ID');
-    showError('Please enter a Session ID');
+    console.warn('[QR] WARN: Empty session ID submitted');
+    showError('Please enter a session ID');
     return;
   }
+
+  console.log('[QR] Manual session ID entered:', sessionId);
   
-  console.log('[QR] Manual ID submitted:', sessionId);
-  await handleQRCodeScanned(sessionId);
-  closeQRScannerInternal();
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      console.error('[QR] ERROR: No authenticated user');
+      showError('Authentication error. Please refresh the page.');
+      return;
+    }
+    
+    const profile = await getUserProfile(user.uid);
+    if (!profile) {
+      console.error('[QR] ERROR: User profile not found');
+      showError('Profile error. Please refresh the page.');
+      return;
+    }
+    
+    console.log('[QR] Calling handleQRCodeScanned with manual ID');
+    await handleQRCodeScanned(sessionId);
+    closeQRScannerInternal();
+  } catch (error) {
+    console.error('[QR] ERROR during manual submission:', error?.message);
+    showError('Error submitting session ID: ' + error.message);
+  }
 };
 
 function showGeoattendanceUI(user, userProfile) {
@@ -395,6 +699,24 @@ function showGeoattendanceUI(user, userProfile) {
 
   document.getElementById('sessionIdGeo').textContent = currentSession.id;
   document.getElementById('lecturerNameGeo').textContent = currentSession.lecturerName;
+
+  // Setup START ATTENDANCE button to trigger geolocation on user click
+  const startGeoBtn = document.getElementById('startAttendanceBtn');
+  if (startGeoBtn) {
+    startGeoBtn.onclick = async () => {
+      console.log('[Geolocation] User clicked START ATTENDANCE');
+      // Disable button during geolocation request
+      startGeoBtn.disabled = true;
+      startGeoBtn.textContent = 'Requesting location...';
+      startGeolocationPolling(auth.currentUser, userProfile);
+    };
+  } else {
+    console.warn('[Student] START ATTENDANCE button not found in DOM');
+  }
+
+  // CRITICAL FIX: Setup QR scanning for geolocation sessions too (as fallback)
+  console.log('[Student] Setting up QR as fallback for geo session');
+  setupQRScanning();
 }
 
 function showQROnlyUI() {
@@ -428,14 +750,6 @@ function showAlreadyAttendedUI() {
   document.getElementById('geoattendanceContainer').style.display = 'none';
   document.getElementById('qrOnlyContainer').style.display = 'none';
   document.getElementById('attendanceRecordedContainer').style.display = 'none';
-}
-
-function showGeoStatusWarning() {
-  const statusEl = document.getElementById('geoStatus');
-  if (statusEl) {
-    statusEl.textContent = 'Waiting for location...';
-    statusEl.style.color = '#f39c12';
-  }
 }
 
 function showLoading(show) {

@@ -3,8 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#2196F3">
   <title>GeoAttend - Student Dashboard</title>
   <link rel="stylesheet" href="/css/style.css">
+  
+  <!-- HTTPS redirect for iOS camera/location access -->
+  <script>
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      window.location.protocol = 'https:';
+    }
+  </script>
 </head>
 <body>
   <div class="navbar">
@@ -42,7 +52,16 @@
         <p><strong>Method:</strong> Geolocation-based</p>
       </div>
 
-      <div class="geo-status-section">
+      <div class="geo-section">
+        <h3>Start Attendance</h3>
+        <p>To mark your attendance, tap the button below. Your location will be verified against the attendance point.</p>
+        <button id="startAttendanceBtn" class="btn btn-primary">📍 Start Attendance (Request Location)</button>
+        <p class="small-text">
+          The system will check your distance from the attendance point. You will be marked present automatically when you are within the attendance radius.
+        </p>
+      </div>
+
+      <div class="geo-status-section" style="display: none;" id="geoStatusSection">
         <h3>Location Status</h3>
         <div id="geoStatus" class="geo-status">Requesting location...</div>
         <p class="small-text">
@@ -53,9 +72,15 @@
         </p>
       </div>
 
-      <div class="loading-indicator">
+      <div class="loading-indicator" style="display: none;" id="geoLoadingIndicator">
         <div class="spinner-small"></div>
         <p>Waiting for attendance...</p>
+      </div>
+
+      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+        <h3>Alternative Method</h3>
+        <p class="small-text">If geolocation doesn't work, you can use a QR code to record attendance:</p>
+        <button id="scanQRBtnGeo" class="btn btn-secondary">📱 Scan QR Code Instead</button>
       </div>
     </div>
 
@@ -198,11 +223,26 @@
 
     // Global function to close QR scanner
     window.closeQRScanner = function() {
-      const modal = document.getElementById('qrScannerModal');
-      if (modal) {
-        modal.style.display = 'none';
-      }
+      console.log('[Student] Closing QR scanner from UI');
+      // Call the JS module's internal close function if available
+      import('./js/student.js').then(module => {
+        if (module.closeQRScannerInternal) {
+          module.closeQRScannerInternal();
+        } else {
+          const modal = document.getElementById('qrScannerModal');
+          if (modal) modal.style.display = 'none';
+        }
+      }).catch(() => {
+        const modal = document.getElementById('qrScannerModal');
+        if (modal) modal.style.display = 'none';
+      });
     };
+
+    // Reset page state on unload to allow switching to other portals
+    window.addEventListener('beforeunload', () => {
+      console.log('[Student] Page unloading, clearing module state');
+      dashboardInitialized = false;
+    });
   </script>
 </body>
 </html>

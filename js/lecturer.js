@@ -22,6 +22,29 @@ let currentViewUser = null;
 let allSessions = [];
 let lecturerInitialized = false;
 
+// Device and browser detection (same as student.js)
+const deviceInfo = {
+  isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
+  isAndroid: /Android/.test(navigator.userAgent),
+  isMobile: /iPad|iPhone|iPod|Android/.test(navigator.userAgent),
+  isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
+  isChrome: /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor),
+  isFirefox: /Firefox/.test(navigator.userAgent),
+  isEdge: /Edg/.test(navigator.userAgent),
+  isWebView: /AppleWebKit/.test(navigator.userAgent) && /Version/.test(navigator.userAgent) && !/Safari/.test(navigator.userAgent)
+};
+
+console.log('[Lecturer Device] Detection:', {
+  isIOS: deviceInfo.isIOS,
+  isAndroid: deviceInfo.isAndroid,
+  isMobile: deviceInfo.isMobile,
+  isSafari: deviceInfo.isSafari,
+  isChrome: deviceInfo.isChrome,
+  isFirefox: deviceInfo.isFirefox,
+  isEdge: deviceInfo.isEdge,
+  userAgent: navigator.userAgent
+});
+
 // Initialize lecturer dashboard
 export async function initLecturerDashboard() {
   console.log('[Lecturer] initLecturerDashboard called, initialized:', lecturerInitialized);
@@ -380,41 +403,119 @@ function setupFormHandlers(user) {
   });
 }
 
+// Check geolocation permission state before requesting
+async function checkGeoPermission() {
+  if (!navigator.permissions) {
+    console.log('[Lecturer Geo] Permissions API not available');
+    return 'unknown';
+  }
+  try {
+    const result = await navigator.permissions.query({ name: 'geolocation' });
+    console.log('[Lecturer Geo] Permission state:', result.state);
+    return result.state; // 'granted' | 'prompt' | 'denied'
+  } catch (error) {
+    console.warn('[Lecturer Geo] Could not query permission:', error.message);
+    return 'unknown';
+  }
+}
+
 function requestLocation(user, radius, duration) {
   showLoading(true);
 
   if (!navigator.geolocation) {
-    showError('Geolocation is not supported by your browser');
+    console.error('[Lecturer Geo] Geolocation NOT SUPPORTED by browser');
     showLoading(false);
+    showError('Geolocation is not supported by your browser. Using QR-only mode.');
+    // Automatically create QR-only session
+    createSession(user, radius, duration, null, null, true);
     return;
   }
 
-  const geoTimeout = setTimeout(() => {
-    showLoading(false);
-    showLocationTimeoutModal(() => {
-      requestLocation(user, radius, duration);
-    }, () => {
-      createSession(user, radius, duration, null, null, true);
-    });
-  }, 10000);
-
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      clearTimeout(geoTimeout);
+  console.log('[Lecturer Geo] Browser supports geolocation, checking permission state...');
+  
+  // Check permission before requesting
+  checkGeoPermission().then((permissionState) => {
+    console.log('[Lecturer Geo] Permission state before request:', permissionState);
+    
+    if (permissionState === 'denied') {
+      console.warn('[Lecturer Geo] Geolocation permission previously denied');
       showLoading(false);
-      const { latitude, longitude } = position.coords;
-      createSession(user, radius, duration, latitude, longitude, false);
-    },
-    (error) => {
-      clearTimeout(geoTimeout);
-      showLoading(false);
-      showLocationTimeoutModal(() => {
-        requestLocation(user, radius, duration);
-      }, () => {
-        createSession(user, radius, duration, null, null, true);
-      });
+      showLocationErrorModal(
+        'Location permission denied. Enable location in browser settings.',
+        () => {
+          createSession(user, radius, duration, null, null, true);
+        }
+      );
+      return;
     }
-  );
+    
+    // Optimal geolocation options for iOS reliability
+    const geoOptions = {
+      enableHighAccuracy: true,  // REQUIRED for iOS to activate GPS hardware
+      timeout: 20000,            // Allow cold start (up to 20 seconds)
+      maximumAge: 0              // Force fresh reading, do NOT use cached
+    };
+    
+    console.log('[Lecturer Geo] Requesting position with optimized options');
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        showLoading(false);
+        console.log('[Lecturer Geo] Position obtained successfully');
+        const { latitude, longitude } = position.coords;
+        createSession(user, radius, duration, latitude, longitude, false);
+      },
+      (error) => {
+        showLoading(false);
+        console.error('[Lecturer Geo] Geolocation error code:', error.code, 'Message:', error.message);
+        
+        // Differentiated error handling
+        if (error.code === error.PERMISSION_DENIED) {
+          console.error('[Lecturer Geo] PERMISSION_DENIED');
+          showLocationErrorModal(
+            'Location permission denied. Enable location in browser settings.',
+            () => {
+              createSession(user, radius, duration, null, null, true);
+            }
+          );
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          console.warn('[Lecturer Geo] POSITION_UNAVAILABLE - attempting QR fallback');
+          showLocationErrorModal(
+            'Location unavailable. Move outdoors or enable Precise Location.',
+            () => {
+              createSession(user, radius, duration, null, null, true);
+            }
+          );
+        } else if (error.code === error.TIMEOUT) {
+          console.warn('[Lecturer Geo] TIMEOUT - location request took too long');
+          showLocationErrorModal(
+            'Location request timed out. Retry or continue with QR.',
+            () => {
+              createSession(user, radius, duration, null, null, true);
+            }
+          );
+        } else {
+          console.error('[Lecturer Geo] UNKNOWN ERROR');
+          showLocationErrorModal(
+            'Unexpected location error. Using QR code mode.',
+            () => {
+              createSession(user, radius, duration, null, null, true);
+            }
+          );
+        }
+      },
+      geoOptions
+    );
+  }).catch((err) => {
+    console.error('[Lecturer Geo] Error checking permission:', err.message);
+    showLoading(false);
+    showLocationErrorModal(
+      'Could not verify location permission. Continuing...',
+      () => {
+        createSession(user, radius, duration, null, null, true);
+      }
+    );
+  });
 }
 
 async function createSession(user, radius, duration, latitude, longitude, qrOnly) {
@@ -638,24 +739,18 @@ async function endSession() {
   }
 }
 
-function showLocationTimeoutModal(onRetry, onContinue) {
+function showLocationErrorModal(message, onContinue) {
   const modal = document.getElementById('locationModal');
   modal.innerHTML = `
     <div class="modal-content">
-      <h2>Location Timeout</h2>
-      <p>Unable to get your location. You can:</p>
+      <h2>Location Error</h2>
+      <p>${message}</p>
       <div class="modal-buttons">
-        <button id="retryLocationBtn" class="btn btn-primary">Retry Location</button>
-        <button id="continueQRBtn" class="btn btn-secondary">Use QR Only</button>
+        <button id="continueQRBtn" class="btn btn-secondary">Continue with QR Code</button>
       </div>
     </div>
   `;
   modal.style.display = 'flex';
-
-  document.getElementById('retryLocationBtn').onclick = () => {
-    modal.style.display = 'none';
-    onRetry();
-  };
 
   document.getElementById('continueQRBtn').onclick = () => {
     modal.style.display = 'none';

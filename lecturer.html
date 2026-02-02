@@ -3,10 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#2196F3">
   <title>GeoAttend - Lecturer Dashboard</title>
   <link rel="stylesheet" href="/css/style.css">
   <script src="https://davidshimjs.github.io/qrcodejs/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  
+  <!-- HTTPS redirect for iOS camera/location access -->
+  <script>
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      window.location.protocol = 'https:';
+    }
+  </script>
 </head>
 <body>
   <div class="navbar">
@@ -278,6 +288,12 @@
 
     // Start immediately
     initDashboard().catch(err => console.error('[Lecturer] Init error:', err));
+
+    // Reset page state on unload to allow switching to other portals
+    window.addEventListener('beforeunload', () => {
+      console.log('[Lecturer] Page unloading, clearing module state');
+      dashboardInitialized = false;
+    });
   </script>
 </body>
 </html>

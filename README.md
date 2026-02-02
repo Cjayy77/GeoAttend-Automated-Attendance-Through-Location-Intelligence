@@ -314,13 +314,72 @@ This ensures one attendance record per student per session.
 
 ## Browser Compatibility
 
-| Browser | Support | Notes |
-|---------|---------|-------|
-| Chrome  | ✅ Full | Recommended |
-| Firefox | ✅ Full | Geolocation requires HTTPS |
-| Safari  | ✅ Full | iOS requires HTTPS |
-| Edge    | ✅ Full | Recommended |
-| IE 11   | ❌ None | Not supported |
+### Desktop
+
+| Browser | Geolocation | QR Camera | Overall | Notes |
+|---------|-------------|-----------|---------|-------|
+| Chrome  | ✅ Full | ✅ Full | ✅ Full | Recommended, works perfectly |
+| Firefox | ✅ Full | ✅ Full | ✅ Full | Works perfectly |
+| Safari  | ✅ Full | ✅ Full | ✅ Full | Works perfectly |
+| Edge    | ✅ Full | ✅ Full | ✅ Full | Works perfectly |
+| IE 11   | ❌ None | ❌ None | ❌ None | Not supported |
+
+**Requirements:** HTTPS for geolocation and camera access (localhost allowed for dev)
+
+### Android
+
+| Browser | Geolocation | QR Camera | Overall | Notes |
+|---------|-------------|-----------|---------|-------|
+| Chrome  | ✅ Full | ✅ Full | ✅ Full | Recommended |
+| Firefox | ✅ Full | ✅ Full | ✅ Full | Works great |
+| Samsung Internet | ✅ Full | ✅ Full | ✅ Full | Works great |
+| Edge    | ✅ Full | ✅ Full | ✅ Full | Works great |
+| Opera   | ✅ Full | ✅ Full | ✅ Full | Works great |
+| Chrome Lite | ⚠️ Limited | ✅ Full | ⚠️ Limited | Geolocation may not work |
+
+**Requirements:** HTTPS, Android 5.0+ recommended
+
+### iOS (Apple devices)
+
+| Browser | Geolocation | QR Camera | Overall | Notes |
+|---------|-------------|-----------|---------|-------|
+| Safari  | ✅ Full | ✅ Full | ✅ **Recommended** | Full native API access |
+| Chrome  | ❌ Restricted | ⚠️ Limited | ❌ **Not Recommended** | Uses WebKit (Apple requirement) with restricted APIs |
+| Firefox | ❌ Restricted | ⚠️ Limited | ❌ **Not Recommended** | Uses WebKit (Apple requirement) with restricted APIs |
+| Edge    | ❌ Restricted | ⚠️ Limited | ❌ **Not Recommended** | Uses WebKit (Apple requirement) with restricted APIs |
+| Opera   | ❌ Restricted | ⚠️ Limited | ❌ **Not Recommended** | Uses WebKit (Apple requirement) with restricted APIs |
+
+**Key Points:**
+- **Safari on iOS:** ✅ Full support - can use geolocation and camera normally
+- **All other browsers on iOS:** ❌ Have restricted geolocation (returns cached/fake data due to Apple's WebKit requirement)
+- **Fallback:** Non-Safari iOS browsers automatically detect restriction and switch to QR code instead
+- **Manual Entry:** If camera also fails, users can manually enter session ID (always available as fallback)
+
+**Requirements:** HTTPS, iOS 12+ recommended
+
+### Fallback Strategy
+
+The system automatically handles all scenarios:
+
+```
+Geolocation-based session?
+├─ YES → Try geolocation
+│  ├─ Success → Use geolocation
+│  ├─ Permission denied → Switch to QR
+│  ├─ Location unavailable → Retry or switch to QR
+│  └─ Non-Safari iOS → Show warning, switch to QR
+│
+└─ NO → Use QR code directly
+
+QR Camera?
+├─ Success → Scan QR code
+├─ Permission denied → Show manual entry form
+├─ Camera unavailable → Show manual entry form
+└─ Any error → Manual entry form (always available)
+
+Manual Entry?
+└─ Always works → User enters session ID manually
+```
 
 ## Performance Tips
 
@@ -328,6 +387,7 @@ This ensures one attendance record per student per session.
 2. **Optimize QR Size:** Adjust in `qr.js` for faster scanning
 3. **Database Indexes:** Consider adding composite indexes for common queries
 4. **Cache Authentication:** Tokens cached automatically by Firebase SDK
+5. **iOS Recommendation:** Use Safari for best geolocation experience
 
 ## Future Enhancements
 
