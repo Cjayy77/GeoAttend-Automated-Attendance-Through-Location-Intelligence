@@ -13,7 +13,8 @@ import {
   collection,
   query,
   where,
-  getDocs
+  getDocs,
+  serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
 // Create new user account
@@ -38,7 +39,7 @@ export async function registerUser(email, password, name, role, level = null) {
       role: role,
       name: name,
       email: email,
-      createdAt: new Date()
+      createdAt: serverTimestamp()  // Use Firestore serverTimestamp instead of new Date()
     };
 
     if (role === 'student' && level) {
