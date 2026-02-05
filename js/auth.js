@@ -1,38 +1,39 @@
 // Authentication functions
-import { auth, db } from './firebase.js';
+import { auth, db, waitForUser } from './firebase.js';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  updateProfile
+  updateProfile,
+  onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import {
   doc,
   setDoc,
   getDoc,
-  collection,
-  query,
-  where,
-  getDocs,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
 // Create new user account
 export async function registerUser(email, password, name, role, level = null) {
   try {
-    // Check if user already exists
-    const usersQuery = query(collection(db, 'users'), where('email', '==', email));
-    const existingUsers = await getDocs(usersQuery);
-    if (!existingUsers.empty) {
-      throw new Error('User with this email already exists');
-    }
-
     // Create auth account
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
+    // Debug logs
+    console.log("[DEBUG] Auth.currentUser UID:", auth.currentUser?.uid);
+    console.log("[DEBUG] User UID from credential:", user.uid);
+    console.log("[DEBUG] Project IDs:", auth.app.options.projectId, db.app.options.projectId);
+
+    // Force ID token generation and synchronization
+    await user.getIdToken(true);
+
     // Update display name
     await updateProfile(user, { displayName: name });
+
+    // Wait for authenticated user before Firestore write
+    const authenticatedUser = await waitForUser();
 
     // Create user profile in Firestore
     const userData = {
@@ -47,8 +48,8 @@ export async function registerUser(email, password, name, role, level = null) {
     }
 
     console.log("SIGNUP PROFILE WRITE ATTEMPT", {
-      uid: user.uid,
-      authUid: auth.currentUser?.uid,
+      uid: authenticatedUser.uid,  // Use authenticated user UID
+      authUid: authenticatedUser.uid,
       role: userData.role,
       roleType: typeof userData.role,
       email: userData.email,
@@ -59,7 +60,8 @@ export async function registerUser(email, password, name, role, level = null) {
       data: userData
     });
 
-    await setDoc(doc(db, 'users', user.uid), userData);
+    // Write to Firestore using authenticated user UID
+    await setDoc(doc(db, 'users', authenticatedUser.uid), userData);
     console.log("[AUTH] Signup profile write SUCCESS");
 
     return user;
@@ -128,3 +130,6 @@ export async function verifyRoleMatch(uid, selectedRole) {
     throw error;
   }
 }
+// Temporary for debugging in browser console
+window.debugAuth = auth;
+window.debugDB = db;
