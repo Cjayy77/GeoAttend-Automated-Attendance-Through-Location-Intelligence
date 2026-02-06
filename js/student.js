@@ -20,6 +20,9 @@ let currentSession = null;
 let lastSessionId = null;
 let studentInitialized = false;
 let currentGeolocationTimeout = null;
+let geoRetryCount = 0;
+const MAX_GEO_RETRIES = 5;
+let isMarkingAttendance = false;
 
 // Device and browser detection
 const deviceInfo = {
@@ -256,6 +259,9 @@ function requestGeolocationPermissionWithFallback(user, userProfile, isRestricte
 function startGeolocationPollingInternal(user, userProfile) {
   console.log('[Geolocation] Setting up polling interval');
   
+  // Show GPS accuracy tip
+  updateGeoStatus('📍 Searching for your location... (Works best outdoors)');
+
   // Initial location request
   requestLocationAndMarkAttendance(user, userProfile);
 
@@ -266,11 +272,20 @@ function startGeolocationPollingInternal(user, userProfile) {
 }
 
 function requestLocationAndMarkAttendance(user, userProfile) {
+  if (geoRetryCount >= MAX_GEO_RETRIES) {
+    updateGeoStatus('❌ Location unavailable after multiple attempts. Switching to QR...');
+    showQROnlyUI();
+    return;
+  }
+  
+  geoRetryCount++;
+  
   // Request location directly - rely on options.timeout only (no wrapper timeout)
   // This prevents the dual-timeout race condition on iOS Safari
 
   navigator.geolocation.getCurrentPosition(
     (position) => {
+      geoRetryCount = 0; // Reset on success
       const { latitude, longitude } = position.coords;
       const distance = calculateDistance(
         latitude,
@@ -306,6 +321,25 @@ function requestLocationAndMarkAttendance(user, userProfile) {
       console.log('[Geolocation] Position received: distance=', distance.toFixed(2), 'radius=', radius);
       updateGeoStatus(`Distance: ${distance.toFixed(2)}m (Radius: ${radius}m)`);
 
+      // User feedback for distance check
+      if (distance > radius) {
+        // User is out of range - give them feedback
+        const metersAway = (distance - radius).toFixed(0);
+        updateGeoStatus(`❌ Out of range by ${metersAway}m. Move closer to mark attendance.`);
+        // Optional: Add visual indicator
+        const geoStatusElement = document.getElementById('geoStatus');
+        if (geoStatusElement) {
+          geoStatusElement.style.color = 'orange';
+        }
+      } else {
+        // User is in range - update status to show they're close
+        updateGeoStatus(`✅ In range! Distance: ${distance.toFixed(2)}m`);
+        const geoStatusElement = document.getElementById('geoStatus');
+        if (geoStatusElement) {
+          geoStatusElement.style.color = 'green';
+        }
+      }
+
       // COMPREHENSIVE GATE CHECK FOR ATTENDANCE STALL
       console.log("ATTENDANCE GATE CHECK", {
         distance: distance.toFixed(2),
@@ -323,6 +357,7 @@ function requestLocationAndMarkAttendance(user, userProfile) {
         willCallMarkAttendance: distance <= radius && attendanceRecorded === false
       });
 
+      // Then the existing attendance marking code
       if (distance <= radius && attendanceRecorded === false) {
         console.log("[ATTENDANCE DEBUG] Inside radius. Proceeding to mark attendance.");
         markAttendance(user, userProfile, "Geo");
@@ -349,8 +384,13 @@ function requestLocationAndMarkAttendance(user, userProfile) {
         }, 500);
       } else if (error.code === error.TIMEOUT) {
         console.warn('[Geolocation] TIMEOUT from getCurrentPosition');
-        updateGeoStatus('⏱️ Location request timed out. Retrying...');
-        // Retry continues at next polling interval (15 seconds)
+        if (geoRetryCount >= MAX_GEO_RETRIES) {
+          updateGeoStatus('❌ Location unavailable after multiple attempts. Switching to QR...');
+          showQROnlyUI();
+        } else {
+          updateGeoStatus(`⏱️ Location timeout. Retry ${geoRetryCount}/${MAX_GEO_RETRIES}...`);
+          // Retry continues at next polling interval (15 seconds)
+        }
       } else {
         console.warn('[Geolocation] Unknown error:', error.message);
         updateGeoStatus('❌ Location error: ' + error.message);
@@ -359,7 +399,7 @@ function requestLocationAndMarkAttendance(user, userProfile) {
     {
       timeout: 8000,  // 8-second timeout for getCurrentPosition (iOS requirement)
       enableHighAccuracy: false,  // Faster on mobile
-      maximumAge: 0  // CHANGED: Don't accept cached positions (prevents stale data)
+      maximumAge: 0  // Force fresh position on iOS
     }
   );
 }
@@ -425,6 +465,14 @@ function hideSpinner() {
 }
 
 async function markAttendance(user, userProfile, method) {
+  // Prevent race condition
+  if (attendanceRecorded || isMarkingAttendance) {
+    console.log('[Attendance] Already recorded or in progress');
+    return;
+  }
+  
+  isMarkingAttendance = true;
+  
   try {
     console.log("MARK ATTENDANCE CALLED", {
       userId: user.uid,
@@ -482,6 +530,8 @@ async function markAttendance(user, userProfile, method) {
     console.error("[ATTENDANCE DEBUG] Firestore write FAILED:", error);
     hideSpinner();
     showError('Failed to record attendance: ' + error.message);
+  } finally {
+    isMarkingAttendance = false;
   }
 }
 
@@ -820,6 +870,28 @@ function showGeoattendanceUI(user, userProfile) {
 }
 
 function showQROnlyUI() {
+  // CRITICAL: Stop ALL geolocation activity
+  stopGeoPolling(); // Stop the polling interval
+  
+  if (currentGeolocationTimeout) {
+    clearTimeout(currentGeolocationTimeout);
+    currentGeolocationTimeout = null;
+  }
+  
+  // Clear any pending geolocation requests
+  if (typeof geolocationWatchId !== 'undefined' && geolocationWatchId !== null) {
+    navigator.geolocation.clearWatch(geolocationWatchId);
+  }
+  
+  // Hide loading indicators
+  const geoLoadingIndicator = document.getElementById('geoLoadingIndicator');
+  if (geoLoadingIndicator) {
+    geoLoadingIndicator.style.display = 'none';
+  }
+  
+  // Reset retry counter
+  geoRetryCount = 0;
+  
   document.getElementById('noSessionContainer').style.display = 'none';
   document.getElementById('geoattendanceContainer').style.display = 'none';
   document.getElementById('qrOnlyContainer').style.display = 'block';
@@ -986,13 +1058,13 @@ function createAttendanceHistoryItem(record) {
         <span class="history-item-method">${method}</span>
       </div>
     </div>
-    <button class="history-item-delete" onclick="event.stopPropagation()" data-record-id="${record.id}">
-      ✕
+    <button class="hide-btn" title="Hide from my view" onclick="event.stopPropagation()" data-record-id="${record.id}">
+      👁️‍🗨️ Hide
     </button>
   `;
 
   // Add hide button handler
-  const hideBtn = item.querySelector('.history-item-delete');
+  const hideBtn = item.querySelector('.hide-btn');
   hideBtn.addEventListener('click', async () => {
     if (confirm('Hide this attendance record from your dashboard?')) {
       await hideAttendanceRecord(record.id);

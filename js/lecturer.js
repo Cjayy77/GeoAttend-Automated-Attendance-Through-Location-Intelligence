@@ -311,8 +311,23 @@ async function deleteSession(sessionId) {
   try {
     showLoading(true);
 
-    // Delete session
+    // 1. Delete the session document
     await deleteDoc(doc(db, 'sessions', sessionId));
+    
+    // 2. Delete all associated attendance records
+    const attendanceQuery = query(
+      collection(db, 'attendance'),
+      where('sessionId', '==', sessionId)
+    );
+    const attendanceSnapshot = await getDocs(attendanceQuery);
+    
+    // Batch delete for efficiency
+    const deletePromises = attendanceSnapshot.docs.map(doc => 
+      deleteDoc(doc.ref)
+    );
+    await Promise.all(deletePromises);
+    
+    console.log(`Deleted session ${sessionId} and ${attendanceSnapshot.size} attendance records`);
 
     showLoading(false);
     showSuccess('Session deleted successfully');
@@ -384,21 +399,21 @@ function setupFormHandlers(user) {
       showError('An active session is already running. End it first.');
       return;
     }
+    // Get and validate radius and duration as numbers
+    const radius = Number(document.getElementById('radiusInput').value);
+    const duration = Number(document.getElementById('durationInput').value);
 
-    const radius = parseInt(document.getElementById('radiusInput').value);
-    const duration = parseInt(document.getElementById('durationInput').value);
-
-    if (radius < 1 || radius > 1000) {
-      showError('Radius must be between 1 and 1000 meters');
+    if (isNaN(radius) || radius <= 0) {
+      showError('Please enter a valid radius');
       return;
     }
 
-    if (duration < 1 || duration > 480) {
-      showError('Duration must be between 1 and 480 minutes');
+    if (isNaN(duration) || duration <= 0) {
+      showError('Please enter a valid duration');
       return;
     }
 
-    // Request geolocation
+    // Continue with geolocation request and session creation
     requestLocation(user, radius, duration);
   });
 }
@@ -541,7 +556,7 @@ async function createSession(user, radius, duration, latitude, longitude, qrOnly
       endTime: Timestamp.fromDate(endTime),
       latitude: latitude || null,
       longitude: longitude || null,
-      radius: radius,
+      radius: Number(radius),  // ← Force convert to number
       active: true,
       geoEnabled: !qrOnly && latitude !== null,
       qrOnly: qrOnly,

@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection - basic auth rules
+    match /users/{userId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    // Sessions collection
+    match /sessions/{sessionId} {
+      // Lecturers can create, read, update, delete their own sessions
+      allow create: if signedIn() && request.auth.uid == request.resource.data.lecturerId;
+      allow read: if signedIn();
+      allow update: if signedIn() && request.auth.uid == resource.data.lecturerId;
+      allow delete: if signedIn() && request.auth.uid == resource.data.lecturerId;
+    }
+
+    // Attendance collection
+    match /attendance/{attendanceId} {
+      // Students can read/write their own attendance
+      allow read, write: if signedIn() && request.auth.uid == request.resource.data.studentId;
+
+      // Lecturers can read attendance for their sessions
+      allow read: if signedIn() &&
+        get(/databases/$(database)/documents/sessions/$(resource.data.sessionId)).data.lecturerId == request.auth.uid;
+
+      // Allow lecturers to delete attendance for their sessions
+      allow delete: if signedIn() &&
+        get(/databases/$(database)/documents/sessions/$(resource.data.sessionId)).data.lecturerId == request.auth.uid;
+    }
+  }
+
+  // Helper function
+  function signedIn() {
+    return request.auth != null;
+  }
+}

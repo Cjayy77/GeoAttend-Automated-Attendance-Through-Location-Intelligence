@@ -4,33 +4,189 @@
   box-sizing: border-box;
 }
 
+
 :root {
-  /* Modern Cream & Dark Green Palette */
-  --primary-color: #2d5016;        /* Dark Green */
-  --primary-light: #4a7c2c;        /* Medium Green */
-  --primary-lighter: #6fa141;      /* Light Green */
-  --secondary-color: #f5f1e8;      /* Cream */
-  --secondary-dark: #e8e2d5;       /* Light Cream */
-  --success-color: #2d5016;        /* Dark Green */
-  --danger-color: #d84c4c;         /* Muted Red */
-  --warning-color: #d4a574;        /* Warm Beige */
-  --light-bg: #faf8f3;             /* Off-white */
-  --dark-text: #1f1f1f;            /* Very Dark Gray */
-  --border-color: #e8e2d5;         /* Light Cream Border */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Modern Green Palette - Vibrant & Professional */
+  --primary-color: #065f46;        /* Rich emerald green */
+  --primary-light: #059669;        /* Bright emerald */
+  --primary-lighter: #10b981;      /* Fresh green */
+  --primary-dark: #064e3b;         /* Deep forest */
+  --secondary-color: #f0fdf4;      /* Mint cream */
+  --secondary-dark: #dcfce7;       /* Light mint */
+  --accent-color: #3b82f6;         /* Electric blue for CTAs */
+  --accent-hover: #2563eb;         /* Darker blue hover */
+  --success-color: #10b981;        /* Bright success green */
+  --danger-color: #ef4444;         /* Vibrant red */
+  --warning-color: #f59e0b;        /* Amber warning */
+  --light-bg: #ffffff;             /* Pure white */
+  --card-bg: #f9fafb;              /* Subtle gray for cards */
+  --dark-text: #111827;            /* True dark */
+  --medium-text: #6b7280;          /* Secondary text */
+  --border-color: #e5e7eb;         /* Modern gray border */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --gradient-primary: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  --gradient-hero: linear-gradient(135deg, #065f46 0%, #059669 50%, #10b981 100%);
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.2);
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-  background: var(--light-bg);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
   color: var(--dark-text);
   min-height: 100vh;
   line-height: 1.6;
   font-weight: 400;
 }
+
+/* Modern Button Styles */
+.btn, button[type="submit"], .primary-btn {
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: var(--shadow-sm);
+  letter-spacing: 0.3px;
+}
+
+.btn:hover, button[type="submit"]:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+/* Secondary button */
+.btn-secondary {
+  background: white;
+  color: var(--primary-color);
+  border: 2px solid var(--primary-color);
+}
+
+.btn-secondary:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* Accent button (for CTAs) */
+.btn-accent {
+  background: var(--accent-color);
+  color: white;
+}
+
+.btn-accent:hover {
+  background: var(--accent-hover);
+}
+
+/* Modern Cards */
+.card, .session-card, .attendance-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+  transition: var(--transition);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+}
+
+/* Glass card variant */
+.card-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+}
+
+/* Modern Inputs */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+select,
+textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: var(--transition);
+  background: white;
+  color: var(--dark-text);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+input::placeholder {
+  color: var(--medium-text);
+}
+
+/* Status Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.badge-success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* Loading Spinner Improvements */
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid var(--secondary-dark);
+  border-top: 3px solid var(--primary-light);
+  border-radius: 50%;
+  animation: spin 0.8s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 
 /* ===================== */
 /* Loading Screen        */
