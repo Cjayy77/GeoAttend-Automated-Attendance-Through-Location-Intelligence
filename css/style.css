@@ -1,3 +1,133 @@
+/* CRITICAL FIX - Text Colors on Cards */
+.card,
+.session-card,
+.attendance-card,
+.auth-card,
+.modal-content,
+.scanner-modal {
+  background: var(--surface-solid); /* White glass */
+  color: var(--text-on-glass); /* Dark text */
+}
+
+.card h2,
+.card h3,
+.card p,
+.card label,
+.card span,
+.modal-content h2,
+.modal-content p,
+.auth-card h1,
+.auth-card h2,
+.auth-card p,
+.auth-card label {
+  color: var(--text-on-glass) !important; /* Force dark text */
+}
+
+/* Form inputs - dark text */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+select,
+textarea {
+  background: white;
+  color: var(--text-on-glass);
+  border: 2px solid var(--border-glass);
+}
+
+input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Navbar - keep white background with dark text */
+.navbar {
+  background: white;
+  color: var(--text-on-glass);
+}
+
+.app-title,
+.user-info,
+.user-info div {
+  color: var(--text-on-glass) !important;
+}
+
+/* Sidebar - white background, dark text */
+.sidebar,
+.student-sidebar {
+  background: white;
+  color: var(--text-on-glass);
+}
+
+.sidebar-item,
+.sidebar-header h3,
+.sidebar-section h4 {
+  color: var(--text-on-glass);
+}
+
+/* Table text */
+.attendance-table th {
+  color: white; /* White text on dark header */
+}
+
+.attendance-table td {
+  color: var(--text-on-glass); /* Dark text on white rows */
+}
+
+/* Session cards */
+.session-card-title,
+.session-card-date,
+.session-card-info p {
+  color: var(--text-on-glass) !important;
+}
+
+/* Attendance history */
+.history-item-lecturer,
+.history-item-details {
+  color: var(--text-on-glass);
+}
+
+/* Buttons - keep good contrast */
+.btn-primary {
+  background: var(--ocean-blue);
+  color: white;
+}
+
+.btn-secondary {
+  background: var(--surface-glass);
+  color: var(--text-primary);
+  border: 2px solid var(--border-glass);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+/* Loading screen - dark background, white text */
+#loadingScreen {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Form loading spinner - keep dark overlay */
+#formLoadingSpinner {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+/* Status messages - fix text colors */
+.error-message {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.success-message {
+  background: var(--seafoam-bg);
+  color: var(--seafoam);
+}
+
+.geo-status {
+  color: var(--text-on-glass);
+}
 * {
   margin: 0;
   padding: 0;
