@@ -469,16 +469,20 @@ input::placeholder {
 
 .btn-role h3 {
   font-size: 20px;
-  color: var(--dark-text);
+  color: #000000;
   margin: 0;
   font-weight: 600;
 }
 
 .btn-role p {
   font-size: 13px;
-  color: var(--dark-text);
+  color: #000000;
   margin: 0;
   opacity: 0.6;
+}
+
+.role-text {
+  color: #000000 !important;
 }
 
 @media (max-width: 600px) {
@@ -504,6 +508,7 @@ input::placeholder {
   padding: 20px;
   background: var(--light-bg);
   width: 100%;
+  margin: 0 auto;
 }
 
 .auth-card {
