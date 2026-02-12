@@ -132,20 +132,21 @@ input::placeholder {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  color: #1f2937
 }
 
 
 :root {
-  /* Modern Green Palette - Vibrant & Professional */
-  --primary-color: #065f46;        /* Rich emerald green */
-  --primary-light: #059669;        /* Bright emerald */
-  --primary-lighter: #10b981;      /* Fresh green */
-  --primary-dark: #064e3b;         /* Deep forest */
-  --secondary-color: #f0fdf4;      /* Mint cream */
-  --secondary-dark: #dcfce7;       /* Light mint */
+  /* Modern Pink Palette - Vibrant & Professional */
+  --primary-color: #be185d;        /* Rich pink */
+  --primary-light: #db2777;        /* Bright pink */
+  --primary-lighter: #f472b6;      /* Fresh pink */
+  --primary-dark: #9d174d;         /* Deep pink */
+  --secondary-color: #fce7f3;      /* Light pink background */
+  --secondary-dark: #fbcfe8;       /* Light pink */
   --accent-color: #3b82f6;         /* Electric blue for CTAs */
   --accent-hover: #2563eb;         /* Darker blue hover */
-  --success-color: #10b981;        /* Bright success green */
+  --success-color: #10b981;        /* Bright success pink */
   --danger-color: #ef4444;         /* Vibrant red */
   --warning-color: #f59e0b;        /* Amber warning */
   --light-bg: #ffffff;             /* Pure white */
@@ -159,15 +160,23 @@ input::placeholder {
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --gradient-primary: linear-gradient(135deg, #059669 0%, #10b981 100%);
-  --gradient-hero: linear-gradient(135deg, #065f46 0%, #059669 50%, #10b981 100%);
+  --gradient-primary: linear-gradient(135deg, #db2777 0%, #f472b6 100%);
+  --gradient-hero: linear-gradient(135deg, #be185d 0%, #db2777 50%, #f472b6 100%);
   --glass-bg: rgba(255, 255, 255, 0.8);
   --glass-border: rgba(255, 255, 255, 0.2);
 }
 
+html {
+  background: url('/assets/gradient-bg.webp');
+  background-attachment: fixed;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+  background: transparent;
   color: var(--dark-text);
   min-height: 100vh;
   line-height: 1.6;
@@ -283,8 +292,8 @@ input::placeholder {
 }
 
 .badge-success {
-  background: #d1fae5;
-  color: #065f46;
+  background: #fbcfe8;
+  color: #be185d;
 }
 
 .badge-warning {
@@ -349,7 +358,7 @@ input::placeholder {
 .loading-spinner {
   width: 50px;
   height: 50px;
-  border: 3px solid rgba(45, 80, 22, 0.15);
+  border: 3px solid rgba(190, 24, 93, 0.15);
   border-top: 3px solid var(--primary-color);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -372,7 +381,7 @@ input::placeholder {
 #formLoadingSpinner .spinner {
   width: 48px;
   height: 48px;
-  border: 3px solid rgba(45, 80, 22, 0.1);
+  border: 3px solid rgba(190, 24, 93, 0.1);
   border-top: 3px solid var(--primary-color);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -458,12 +467,12 @@ input::placeholder {
 }
 
 .btn-student .btn-role-icon {
-  background: rgba(79, 161, 65, 0.1);
+  background: rgba(220, 38, 38, 0.1);
   color: var(--primary-light);
 }
 
 .btn-lecturer .btn-role-icon {
-  background: rgba(45, 80, 22, 0.1);
+  background: rgba(190, 24, 93, 0.1);
   color: var(--primary-color);
 }
 
@@ -506,7 +515,7 @@ input::placeholder {
   align-items: center;
   min-height: 100vh;
   padding: 20px;
-  background: var(--light-bg);
+  background: transparent;
   width: 100%;
   margin: 0 auto;
 }
@@ -608,7 +617,7 @@ input::placeholder {
   outline: none;
   border-color: var(--primary-color);
   background: white;
-  box-shadow: 0 0 0 3px rgba(45, 80, 22, 0.08);
+  box-shadow: 0 0 0 3px rgba(190, 24, 93, 0.08);
 }
 
 .form-group input::placeholder {
@@ -761,7 +770,7 @@ input::placeholder {
 }
 
 .level-badge {
-  background: rgba(45, 80, 22, 0.08);
+  background: rgba(190, 24, 93, 0.08);
   color: var(--primary-color);
   padding: 4px 10px;
   border-radius: 12px;
@@ -820,7 +829,7 @@ input::placeholder {
 }
 
 .success-message {
-  background: rgba(45, 80, 22, 0.1);
+  background: rgba(190, 24, 93, 0.1);
   color: var(--primary-color);
   padding: 14px 16px;
   border-radius: 10px;
@@ -1677,7 +1686,7 @@ input::placeholder {
 #loadingSpinner .spinner {
   width: 48px;
   height: 48px;
-  border: 3px solid rgba(45, 80, 22, 0.1);
+  border: 3px solid rgba(190, 24, 93, 0.1);
   border-top: 3px solid var(--primary-color);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -1693,7 +1702,7 @@ input::placeholder {
 .lecturer-layout {
   display: flex;
   min-height: calc(100vh - 70px);
-  background: var(--light-bg);
+  background: transparent;
 }
 
 .sidebar {
@@ -1749,7 +1758,7 @@ input::placeholder {
 }
 
 .sidebar-item.active {
-  background: rgba(45, 80, 22, 0.1);
+  background: rgba(190, 24, 93, 0.1);
   color: var(--primary-color);
 }
 
@@ -1801,7 +1810,7 @@ input::placeholder {
 }
 
 .session-item-sidebar.active {
-  background: rgba(45, 80, 22, 0.1);
+  background: rgba(190, 24, 93, 0.1);
   border-color: var(--primary-color);
   color: var(--primary-color);
   font-weight: 600;
@@ -2267,7 +2276,7 @@ input::placeholder {
 .student-layout {
   display: flex;
   min-height: calc(100vh - 70px);
-  background: var(--light-bg);
+  background: transparent;
 }
 
 .student-main-content {
@@ -2344,7 +2353,7 @@ input::placeholder {
 }
 
 .history-item-method {
-  background: rgba(45, 80, 22, 0.1);
+  background: rgba(190, 24, 93, 0.1);
   color: var(--primary-color);
   padding: 2px 6px;
   border-radius: 4px;
