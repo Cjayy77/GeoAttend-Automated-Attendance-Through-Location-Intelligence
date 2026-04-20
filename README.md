@@ -4,7 +4,7 @@ A complete, fully functional web-based attendance system that combines geolocati
 
 ## Features
 
-✅ **Authentication**
+✅ **Authentication** 
 - Email/password registration and login
 - Role-based access (Student/Lecturer)
 - Firebase Authentication
