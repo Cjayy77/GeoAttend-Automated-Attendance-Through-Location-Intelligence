@@ -10,7 +10,7 @@ A complete, fully functional web-based attendance system that combines geolocati
 - Firebase Authentication
 
 ✅ **Lecturer Features**
-- Create attendance sessions
+- Create attendance sessions 
 - Set attendance radius (10-1000m)
 - Set session duration
 - Real-time geolocation support
