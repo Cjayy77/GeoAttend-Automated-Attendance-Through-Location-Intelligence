@@ -3,7 +3,7 @@
 A complete, fully functional web-based attendance system that combines geolocation and QR code-based marking.     
 
 ## Features
-
+ 
 ✅ **Authentication** 
 - Email/password registration and login
 - Role-based access (Student/Lecturer)
