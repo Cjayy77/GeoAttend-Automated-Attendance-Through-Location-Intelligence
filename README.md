@@ -1,7 +1,7 @@
  # GeoAttend - Geolocation + QR Attendance System  
      
 A complete, fully functional web-based attendance system that combines geolocation and QR code-based marking.         
-    
+     
 ## Features
  
 ✅ **Authentication**    
